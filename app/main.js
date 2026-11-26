@@ -67,7 +67,7 @@ function sampleData(){
 }
 
 /* ---------- state ---------- */
-const S={data:null,brief:null,conn:null,items:[],dismissed:new Set(),learning:null,sample:sampleData(),deckI:0};
+const S={data:null,brief:null,conn:null,items:[],dismissed:new Set(),learning:null,sample:sampleData(),deckI:0,real:{mail:false,cal:false}};
 try{JSON.parse(localStorage.getItem('tt-dismissed')||'[]').forEach(x=>S.dismissed.add(x));}catch{}
 const saveDismissed=()=>{try{localStorage.setItem('tt-dismissed',JSON.stringify([...S.dismissed].slice(-80)));}catch{}};
 const NODE_OF={assets:'Supabase',tasks:'GitHub',seo:'GoatCounter',finance:'Finance',monitor:'Cloudflare',research:'GitHub',services:'Cloudflare'};
@@ -140,7 +140,7 @@ function composeVoice(){
   const parts=[`${hi}, Nathan.`];
   if(top)parts.push(`${top.level==='urgent'?'The one that matters most':'First up'}: ${titleOf(top).replace(/\.$/,'')}.`);
   if(merged.length){const k=merged.reduce((n,c)=>n+c.members.length,0);parts.push(`I merged ${NUM[k]||k} near-identical checks into ${merged.length===1?'one job':merged.length+' jobs'}.`);}
-  const cap=w=>w[0].toUpperCase()+w.slice(1);parts.push(`${cap(NUM[need]||String(need))} email${need===1?'':'s'} need${need===1?'s':''} you, and I've drafted ${NUM[drafted]||drafted} replies.`);
+  const cap=w=>w[0].toUpperCase()+w.slice(1);parts.push(`${cap(NUM[need]||String(need))} email${need===1?'':'s'} need${need===1?'s':''} you${drafted?`, and I've drafted ${NUM[drafted]||drafted} ${drafted===1?'reply':'replies'}`:''}.`);
   if(nextEv)parts.push(`Next on your calendar: ${nextEv.title} at ${hhmm(nextEv.start)}.`);
   speak(head.replace(/\.$/,'')+'.',parts.join(' '));
 }
@@ -148,7 +148,7 @@ function chainItems(){
   const top=S.items[0];
   const email=S.sample.emails.find(e=>e.triage==='need'&&e.draft);
   const ahead=allAhead()[0];
-  return [top&&{lab:'Now',it:top},email&&{lab:'Next',it:{kind:'email',e:email,key:'e:'+email.id,node:'Gmail',sample:true}},ahead&&{lab:'Then',it:{kind:'ahead',a:ahead,key:'a:'+ahead.title,node:'Calendar',sample:ahead.sample,title:ahead.title}}].filter(Boolean);
+  return [top&&{lab:'Now',it:top},email&&{lab:'Next',it:{kind:'email',e:email,key:'e:'+email.id,node:'Gmail',sample:!S.real.mail}},ahead&&{lab:'Then',it:{kind:'ahead',a:ahead,key:'a:'+ahead.title,node:'Calendar',sample:ahead.sample,title:ahead.title}}].filter(Boolean);
 }
 function renderChain(){
   const c=chainItems();
@@ -204,7 +204,7 @@ function renderInbox(){
   const E=S.sample.emails;
   $('inbox-meta').textContent=`${E.filter(e=>e.triage==='need').length} need you · ${E.filter(e=>e.draft).length} drafted`;
   $('inbox').innerHTML=E.map(e=>`<button type="button" class="row" data-id="${e.id}"><span class="av">${esc(e.ini)}</span><span class="t">${esc(e.subject)}</span><span class="when">${hhmm(e.when)}</span><span class="s">${esc(e.from)} · ${esc(e.summary)}</span><span class="tri ${TRI[e.triage][1]}">${e.draft&&e.triage==='need'?'Draft ready':TRI[e.triage][0]}</span></button>`).join('');
-  $('inbox').querySelectorAll('.row').forEach(r=>r.addEventListener('click',()=>{const e=E.find(x=>x.id===r.dataset.id);openFocus({kind:'email',e,key:'e:'+e.id,node:'Gmail',sample:true},r);}));
+  $('inbox').querySelectorAll('.row').forEach(r=>r.addEventListener('click',()=>{const e=E.find(x=>x.id===r.dataset.id);openFocus({kind:'email',e,key:'e:'+e.id,node:'Gmail',sample:!S.real.mail},r);}));
 }
 
 /* ---------- two steps ahead ---------- */
@@ -226,7 +226,7 @@ function countdown(d){if(!d)return '';const m=Math.round((d-Date.now())/60000);i
 function renderAhead(){
   const A=allAhead();
   $('ahead').innerHTML=A.map((a,i)=>`<button type="button" class="fut ${a.crit?'crit':''}" data-i="${i}"><div class="when"><span>${esc(a.when)}</span>${a.at?`<span class="cd">${countdown(a.at)}</span>`:''}${a.sample?'<span class="sample">Sample</span>':''}</div><h4>${esc(a.title)}</h4><p>${esc(a.detail||'')}</p>${a.move?`<p class="move"><b>My move</b>${esc(a.move)}</p>`:''}</button>`).join('');
-  $('ahead').querySelectorAll('.fut').forEach(b=>b.addEventListener('click',()=>{const a=A[+b.dataset.i];openFocus(a.ev?{kind:'event',ev:a.ev,key:'ev:'+a.ev.id,node:'Calendar',sample:true}:{kind:'ahead',a,key:'a:'+a.title,node:'Calendar',sample:a.sample,title:a.title},b);}));
+  $('ahead').querySelectorAll('.fut').forEach(b=>b.addEventListener('click',()=>{const a=A[+b.dataset.i];openFocus(a.ev?{kind:'event',ev:a.ev,key:'ev:'+a.ev.id,node:'Calendar',sample:!S.real.cal}:{kind:'ahead',a,key:'a:'+a.title,node:'Calendar',sample:a.sample,title:a.title},b);}));
 }
 
 /* ---------- today ribbon (sample calendar) ---------- */
@@ -247,7 +247,7 @@ function renderToday(){
   $('today-plan').textContent=G.length?`${G.length} free slot${G.length===1?'':'s'} left today. I've fitted ${NUM[used]||used} jobs into them, most urgent first, so nothing waits for a free afternoon.`:'No free time left today. Anything new waits for tomorrow\'s plan.';
   tr.querySelectorAll('.hour').forEach(x=>x.style.left=pct(new Date(new Date().setHours(+x.dataset.h,0,0,0)))+'%');
   tr.querySelectorAll('.ev').forEach(x=>{const e=S.sample.events.find(y=>y.id===x.dataset.id);x.style.left=`calc(${pct(e.start)}% + 2px)`;x.style.width=`calc(${pct(e.end)-pct(e.start)}% - 4px)`;
-    glassLight(x);x.addEventListener('click',()=>openFocus({kind:'event',ev:e,key:'ev:'+e.id,node:'Calendar',sample:true},x));});
+    glassLight(x);x.addEventListener('click',()=>openFocus({kind:'event',ev:e,key:'ev:'+e.id,node:'Calendar',sample:!S.real.cal},x));});
   tickNow(true);
 }
 function tickNow(scroll){const n=$('nowline');if(!n)return;const d=new Date();const p=pct(d);n.hidden=p<0||p>100;n.style.left=p+'%';n.dataset.t=hhmm(d);
@@ -298,11 +298,11 @@ function detail(it){
     <div class="d-sec"><h3>Why this order</h3><p>${esc(it.w.reason)}</p></div></div>`;
   if(it.kind==='improvement')return BACK+`<div class="d-head"><h2 id="d-title">${esc(it.title||firstSentence(it.text))}</h2></div><div class="d-sec"><h3>What I'd change</h3><p>${esc(it.text)}</p></div>
     <div class="actions"><button class="act primary" data-act="add">Make this an action</button>${decisionBtns}</div>`;
-  if(it.kind==='email'){const e=it.e;return BACK+`<div class="d-head"><h2 id="d-title">${esc(e.subject)}</h2><div class="row2"><div class="kv"><span>From</span><b>${esc(e.from)}</b></div><div class="kv"><span>Received</span><b>${hhmm(e.when)}</b></div><div class="kv"><span>Area</span><b>${esc(e.group)}</b></div><span class="sample">Sample</span></div></div>
+  if(it.kind==='email'){const e=it.e;return BACK+`<div class="d-head"><h2 id="d-title">${esc(e.subject)}</h2><div class="row2"><div class="kv"><span>From</span><b>${esc(e.from)}</b></div><div class="kv"><span>Received</span><b>${hhmm(e.when)}</b></div><div class="kv"><span>Area</span><b>${esc(e.group)}</b></div>${S.real.mail?'':'<span class="sample">Sample</span>'}</div></div>
     <div class="d-grid"><div class="d-sec"><h3>What it says</h3><p>${esc(e.summary)}</p>${e.fix?`<h3 class="mt">What I'd do</h3><p>${esc(e.fix)}. It takes about a minute and removes the risk.</p>`:''}</div>
     ${e.draft?`<div class="d-sec"><h3>Reply I've drafted</h3><div class="draft">${esc(e.draft)}</div></div>`:''}</div>
-    <div class="actions">${e.draft?`<button class="act primary" data-act="sample">Send this reply</button><button class="act" data-act="sample">Edit draft</button>`:e.fix?`<button class="act primary" data-act="sample">${esc(e.fix)}</button>`:`<button class="act" data-act="sample">Archive</button>`}<button class="act quiet" data-act="close">Not now</button></div>`;}
-  if(it.kind==='event'){const v=it.ev;return BACK+`<div class="d-head"><h2 id="d-title">${esc(v.title)}</h2><div class="row2"><div class="kv"><span>When</span><b>${hhmm(v.start)}–${hhmm(v.end)}</b></div>${v.where?`<div class="kv"><span>Where</span><b>${esc(v.where)}</b></div>`:''}<span class="sample">Sample</span></div></div>
+    <div class="actions">${e.draft?`<button class="act primary" data-act="sample">Send this reply</button><button class="act" data-act="sample">Edit draft</button>`:e.fix?`<button class="act primary" data-act="sample">${esc(e.fix)}</button>`:S.real.mail?`<button class="act primary" data-act="gmail" data-href="https://mail.google.com/mail/u/0/#inbox/${esc(e.thread||e.id)}">Open in Gmail</button>`:`<button class="act" data-act="sample">Archive</button>`}<button class="act quiet" data-act="close">Not now</button></div>`;}
+  if(it.kind==='event'){const v=it.ev;return BACK+`<div class="d-head"><h2 id="d-title">${esc(v.title)}</h2><div class="row2"><div class="kv"><span>When</span><b>${hhmm(v.start)}–${hhmm(v.end)}</b></div>${v.where?`<div class="kv"><span>Where</span><b>${esc(v.where)}</b></div>`:''}${S.real.cal?'':'<span class="sample">Sample</span>'}</div></div>
     <div class="d-sec"><h3>Before it starts</h3><p>${esc(v.note||'Nothing to prepare. I\'ll remind you ten minutes before.')}</p></div><div class="actions"><button class="act quiet" data-act="close">Close</button></div>`;}
   if(it.kind==='ahead'){const a=it.a;return BACK+`<div class="d-head"><h2 id="d-title">${esc(a.title)}</h2><div class="row2"><div class="kv"><span>When</span><b>${esc(a.when)}</b></div>${a.sample?'<span class="sample">Sample</span>':''}</div></div>
     <div class="d-sec"><h3>Why I'm flagging it now</h3><p>${esc(a.detail||'')}</p></div><div class="actions">${a.ref?`<button class="act primary" data-act="email" data-id="${a.ref}">Open the email</button>`:''}<button class="act quiet" data-act="close">Close</button></div>`;}
@@ -379,8 +379,9 @@ detailEl.addEventListener('click',async e=>{
   if(a==='close')return closeFocus();
   if(a==='openref'){const r=it.open;closeFocus();setTimeout(()=>openFocus(r,null),420);return;}
   if(a==='open'||a==='node'){const n=S.graph.nodes.find(x=>x.id===b.dataset.id);if(!n)return;closeFocus();setTimeout(()=>{env.hot=n.id;openFocus(n.kind==='item'?n.ref:{kind:'node',n,key:'n:'+n.id,node:n.kind==='source'?n.label:null,sample:true},labelEls.get(n.id)||null);},420);return;}
+  if(a==='gmail'){window.open(b.dataset.href,'_blank','noopener');return;}
   if(a==='sample'){toast('<b>This is sample data.</b> Nothing was sent. Once Gmail is connected this button does it for real.');return;}
-  if(a==='email'){const em=S.sample.emails.find(x=>x.id===b.dataset.id);closeFocus();setTimeout(()=>openFocus({kind:'email',e:em,key:'e:'+em.id,node:'Gmail',sample:true},document.querySelector(`.row[data-id="${em.id}"]`)),450);return;}
+  if(a==='email'){const em=S.sample.emails.find(x=>x.id===b.dataset.id);closeFocus();setTimeout(()=>openFocus({kind:'email',e:em,key:'e:'+em.id,node:'Gmail',sample:!S.real.mail},document.querySelector(`.row[data-id="${em.id}"]`)),450);return;}
   try{
     if(a==='done'){b.disabled=true;await api('/api/task',{id:Number(b.dataset.id),done:true});toast('<b>Marked as done.</b>');
       if(it.kind==='cluster'){b.textContent='Done ✓';await load(true);decide(it,'Marked one as done','What made this one the right one to finish first?',['It was the most at risk','It was quickest','Someone was waiting','Just working through them']);return;}
@@ -404,7 +405,7 @@ $('assess').addEventListener('click',async e=>{const b=e.currentTarget;toggleMen
   try{await api('/api/assess',{});spoken='';await load(true);toast('<b>Fresh assessment ready.</b> I\'ve rearranged things to match.');}catch(err){toast(esc(err.message));}env.thinkGoal=0;b.disabled=false;});
 $('signout').addEventListener('click',async()=>{try{await fetch('/auth/logout',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:'{}'});}catch{}location.replace('/login');});
 $('cmd').addEventListener('submit',async e=>{e.preventDefault();const i=$('cmd-input');const v=i.value.trim();if(!v)return;const q=v.toLowerCase();
-  const pool=[...S.items,...S.sample.emails.map(e=>({kind:'email',e,key:'e:'+e.id,node:'Gmail',sample:true})),...S.sample.events.map(ev=>({kind:'event',ev,key:'ev:'+ev.id,node:'Calendar',sample:true}))];
+  const pool=[...S.items,...S.sample.emails.map(e=>({kind:'email',e,key:'e:'+e.id,node:'Gmail',sample:!S.real.mail})),...S.sample.events.map(ev=>({kind:'event',ev,key:'ev:'+ev.id,node:'Calendar',sample:!S.real.cal}))];
   const hit=q.length>2&&pool.find(x=>(titleOf(x)+' '+(x.kind==='email'?x.e.from+' '+x.e.group:'')+' '+(x.group||'')).toLowerCase().includes(q));
   if(hit){i.value='';const el=document.querySelector(`[data-id="${hit.e?.id||hit.ev?.id}"]`)||$('deck');openFocus(hit,el);return;}
   $('cmd').classList.add('thinking');env.thinkGoal=1;env.burst();
@@ -429,8 +430,8 @@ function buildFeed(){
   const h=health();const q=[];
   h.src.filter(s=>s.status==='ok').forEach(s=>{const d=s.data||{};q.push({name:s.name,text:s.name==='GitHub'?`${d.count??'?'} repos, ${d.openIssues??'?'} open issues`:s.name==='Cloudflare'?`${d.count??'?'} zones checked`:s.name==='Supabase'?`${(d.projects||[]).filter(p=>p.status==='ACTIVE_HEALTHY').length} of ${d.count??'?'} projects healthy`:'reporting'});});
   h.sites.forEach(s=>q.push({name:'Sites',text:`${s.name} answered ${s.status??'?'} in ${s.ms??'?'} ms`,crit:s.status>=500}));
-  const E=S.sample.emails;q.push({name:'Gmail',text:`${E.length} new · ${E.filter(e=>e.triage==='need').length} need you (sample)`,crit:true});
-  q.push({name:'Calendar',text:`${S.sample.events.filter(e=>e.end>new Date()).length} events left today (sample)`});
+  const E=S.sample.emails;q.push({name:'Gmail',text:`${E.length} new · ${E.filter(e=>e.triage==='need').length} need you${S.real.mail?'':' (sample)'}`,crit:true});
+  q.push({name:'Calendar',text:`${S.sample.events.filter(e=>e.end>new Date()).length} events left today${S.real.cal?'':' (sample)'}`});
   q.push({name:'GoatCounter',text:`${S.sample.analytics.sessions.slice(-1)[0]} visitors yesterday (sample)`});
   q.push({name:'LinkedIn',text:`${S.sample.social.followers} followers (sample)`});
   for(let i=q.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[q[i],q[j]]=[q[j],q[i]];}
@@ -442,7 +443,7 @@ env.onPulse=m=>{const t=$('live-text');t.classList.add('swap');setTimeout(()=>{t
 /* ---------- today: free time gets a plan ---------- */
 const dur=ms=>{const m=Math.round(ms/60000);const h=Math.floor(m/60),r=m%60;return h?`${h}h${r?' '+String(r).padStart(2,'0'):''}`:m+' min';};
 function todoPool(){
-  const E=id=>S.sample.emails.find(e=>e.id===id);const em=e=>({kind:'email',e,key:'e:'+e.id,node:'Gmail',sample:true});const out=[];
+  const E=id=>S.sample.emails.find(e=>e.id===id);const em=e=>({kind:'email',e,key:'e:'+e.id,node:'Gmail',sample:!S.real.mail});const out=[];
   if(E('e1'))out.push({t:'Sign the SEBP contract',min:10,it:em(E('e1')),crit:true,sample:true});
   if(E('e3'))out.push({t:'Turn on auto-renew',min:5,it:em(E('e3')),crit:true,sample:true});
   S.items.filter(x=>x.level==='urgent').slice(0,2).forEach(x=>out.push({t:x.kind==='cluster'?x.title:titleOf(x),min:20,it:x,crit:true}));
@@ -464,7 +465,7 @@ function gapPlan(){
 function ideas(){
   const out=[];const E=id=>S.sample.emails.find(e=>e.id===id);const cl=S.items.find(x=>x.kind==='cluster');
   if(E('e1'))out.push({id:'sebp-sign',title:'Sign the SEBP contract today, not on Friday',why:'The venue releases the date at 5pm Friday. It is also on today\'s committee call agenda, so signing first turns a discussion into a two minute update.',value:'Date secured a day early',eff:'10 min',crit:true,sample:true,
-    steps:[['Open the email and check the two changed clauses: cancellation terms and catering minimums'],['Sign and send the reply I drafted']],open:{kind:'email',e:E('e1'),key:'e:e1',node:'Gmail',sample:true}});
+    steps:[['Open the email and check the two changed clauses: cancellation terms and catering minimums'],['Sign and send the reply I drafted']],open:{kind:'email',e:E('e1'),key:'e:e1',node:'Gmail',sample:!S.real.mail}});
   if(cl)out.push({id:'own-once',title:`Do the ${NUM[cl.members.length]||cl.members.length} ownership checks in one sitting`,why:'Each check needs the same evidence: who owns it, who pays, and whether backups restore. Gathering it once and recording it in one register stops the same work being redone three times.',value:'One register instead of three reviews',eff:'20 min',crit:cl.level==='urgent',
     steps:cl.members.map(m=>[m.label+': '+(m.p.action||'confirm the owner and payer')]),open:cl});
   out.push({id:'tap-titles',title:'Rewrite the titles of TAP\'s three most-seen pages',why:'Search clicks rose from 30 to 52, but click-through only moved from 0.84% to 0.90%. The gain came from being shown more, not from more people choosing you. Better titles are the quickest lift.',value:'About 115 clicks a month at 2% click-through',eff:'1 hour',
@@ -474,7 +475,7 @@ function ideas(){
   out.push({id:'li-tap',title:'Turn your next TAP article into a LinkedIn post',why:'Your hot-spot policing post reached 3,120 people, far above your usual reach. Pairing each new article with a short post brings that audience back to the site.',value:'Steady traffic from your strongest channel',eff:'15 min',sample:true,
     steps:[['When the article is published, I draft the post with the key finding first'],['You edit and approve it'],['I suggest the best time to post based on past reach']]});
   if(E('e4'))out.push({id:'receipts',title:'Have AI receipts collected automatically each month',why:'Your accountant asks for these every quarter. A Gmail filter can label every receipt by company as it arrives, and this app can file them, so quarter-end is one click.',value:'An hour saved every quarter',eff:'15 min once',sample:true,
-    steps:[['Connect Google (see Plugged in below)'],['I create the filter and labels for each company'],['Each quarter I share one folder with your accountant, after you approve']],open:{kind:'email',e:E('e4'),key:'e:e4',node:'Gmail',sample:true}});
+    steps:[['Connect Google (see Plugged in below)'],['I create the filter and labels for each company'],['Each quarter I share one folder with your accountant, after you approve']],open:{kind:'email',e:E('e4'),key:'e:e4',node:'Gmail',sample:!S.real.mail}});
   S.items.filter(x=>x.kind==='improvement').forEach(x=>out.push({id:x.key,title:x.title||firstSentence(x.text),why:x.title?x.text:x.text.replace(firstSentence(x.text),'').trim(),value:'Less repeated checking',eff:'Half a day',steps:[],imp:x}));
   return out.filter(x=>!S.dismissed.has('idea:'+x.id)).map(x=>({...x,kind:'idea',key:'idea:'+x.id,node:x.open?.node||'Supabase',text:x.why,level:'opportunity'}));
 }
@@ -548,6 +549,21 @@ function renderGoogle(){
   const o=$('g-off');if(o)o.onclick=async()=>{try{await api('/api/google/disconnect',{});GOOG.s=await api('/api/google/status');delete CONNECT[0].live;}catch(e){toast(`<b>Not disconnected.</b> ${esc(e.message)}`);}renderGoogle();renderSources();};
 }
 
+
+/* ---------- real Gmail and Calendar: summaries only, nothing is sent or changed ---------- */
+const decode=s=>String(s||'').replace(/&#39;/g,"'").replace(/&quot;/g,'"').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/\s+/g,' ').trim();
+function mapMail(x){const m=/^\s*"?([^"<]*?)"?\s*<([^>]+)>\s*$/.exec(x.from||'');const addr=(m?m[2]:x.from||'').toLowerCase(),name=decode((m&&m[1])||addr.split('@')[0]||'Unknown');
+  const auto=x.bulk||/(no-?reply|notification|noreply|mailer|donotreply|news|digest|alerts?@|support@|billing@|github\.com|linkedin\.com)/.test(addr);
+  const dom=(addr.split('@')[1]||'').replace(/^(mail|email|e|info)\./,'');
+  return {id:x.id,thread:x.thread,from:name,ini:name.split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase()||'?',subject:decode(x.subject)||'(no subject)',when:new Date(x.when),triage:auto?'wait':'need',group:dom,summary:decode(x.snippet).slice(0,170)};}
+async function loadFeed(){if(!(GOOG.s&&GOOG.s.connected))return;
+  try{const f=await api('/api/google/feed');GOOG.feedErr=f.errors||{};
+    if(!GOOG.feedErr.gmail){S.sample.emails=(f.emails||[]).map(mapMail);S.real.mail=true;document.querySelectorAll('.t-inbox .sample,#inbox-smp').forEach(x=>x.remove());}
+    if(!GOOG.feedErr.calendar){const t0=new Date().setHours(0,0,0,0),t1=t0+864e5;S.sample.events=(f.events||[]).filter(e=>!e.allDay&&e.start&&e.end&&+new Date(e.start)>=t0&&+new Date(e.start)<t1).map(e=>({id:e.id,start:new Date(e.start),end:new Date(e.end),title:e.title,where:e.where||''}));S.real.cal=true;const ts=$('today-smp');if(ts)ts.remove();}
+  }catch(e){GOOG.feedErr={google:e.message};}
+  repaint();}
+function repaint(){S.ideas=ideas();S.graph=graphData();env.setGraph(S.graph);composeVoice();renderChain();renderDeck();renderIdeas();renderInbox();renderAhead();renderToday();renderPulse();renderSources();renderGoogle();renderPreviews();refreshConns();}
+
 /* ---------- the map: every source, project and item, joined where they really connect ---------- */
 const SRC_OF_KIND={'Repository':'GitHub','DNS zone':'Cloudflare','Worker':'Cloudflare','Pages project':'Cloudflare','Database':'Supabase','Search Console':'GoatCounter'};
 const EV_GROUP=[[/sebp/i,'sebp'],[/mortgage/i,'mortgage'],[/tap\b|policing/i,'tap'],[/accountant|inbox/i,'traceytech']];
@@ -561,8 +577,8 @@ function graphData(){
     if(a.kind==='DNS zone'&&h.sites.some(x=>x.name===a.name))edges.push(['s:Sites',id,2.4]);});
   const item=(it,label,src,groups,crit,sample)=>{const id='i:'+it.key;add({id,kind:'item',label,crit,sample,ref:it,near:'s:'+src,w:1.4});edges.push(['s:'+src,id,1.9]);groups.filter(g=>G[g]).forEach(g=>edges.push(['p:'+g,id,1.3]));};
   S.items.forEach(it=>item(it,it.kind==='cluster'?it.title:titleOf(it),it.node,it.kind==='cluster'?[...new Set(it.members.map(m=>m.p.group))]:it.kind==='priority'?[it.p.group]:it.kind==='project'?[it.w.group]:[],isCrit(it),false));
-  S.sample.emails.forEach(e=>item({kind:'email',e,key:'e:'+e.id,node:'Gmail',sample:true},e.subject,'Gmail',[groupKey(e.group)],e.triage==='need',true));
-  S.sample.events.forEach(ev=>item({kind:'event',ev,key:'ev:'+ev.id,node:'Calendar',sample:true},ev.title,'Calendar',EV_GROUP.filter(([r])=>r.test(ev.title+' '+(ev.note||''))).map(x=>x[1]).slice(0,1),false,true));
+  S.sample.emails.forEach(e=>item({kind:'email',e,key:'e:'+e.id,node:'Gmail',sample:!S.real.mail},e.subject,'Gmail',[groupKey(e.group)],e.triage==='need',true));
+  S.sample.events.forEach(ev=>item({kind:'event',ev,key:'ev:'+ev.id,node:'Calendar',sample:!S.real.cal},ev.title,'Calendar',EV_GROUP.filter(([r])=>r.test(ev.title+' '+(ev.note||''))).map(x=>x[1]).slice(0,1),false,true));
   return {nodes,edges};
 }
 function neighbours(id){const g=S.graph;const out=new Set();g.edges.forEach(([a,b])=>{if(a===id)out.add(b);if(b===id)out.add(a);});return [...out].map(x=>g.nodes.find(n=>n.id===x)).filter(Boolean);}
@@ -793,7 +809,7 @@ const FIX={
  'Your sites':[['Cloudflare DNS','https://dash.cloudflare.com/'],['Search Console','https://search.google.com/search-console']]};
 function connItems(){
   const N=nodeStates(),h=health(),g=GOOG.s,items=[];
-  const gOk=g&&g.connected,gBad=gOk&&g.test&&(g.test.results||[]).filter(r=>!r.ok&&r.name!=='Analytics');
+  const gOk=g&&g.connected,gBad=gOk?[...(g.test?(g.test.results||[]).filter(r=>!r.ok&&r.name!=='Analytics'):[]),...Object.keys(GOOG.feedErr||{}).map(k=>({name:k==='gmail'?'Gmail':k==='calendar'?'Calendar':'Google'}))].filter((r,i,a)=>a.findIndex(x=>x.name===r.name)===i):false;
   items.push({name:'Google',state:!g||g.error?'off':!gOk?'off':(gBad&&gBad.length)||g.refused?'dropped':'ok',
     why:!gOk?'Not connected yet':gBad&&gBad.length?`${gBad.map(r=>r.name).join(', ')} not answering`:g.refused?'Google refused the saved login':'Gmail, Calendar, Search Console, Drive',fix:FIX.Google});
   ['GitHub','Cloudflare','Supabase'].forEach(n=>{const s=N.find(x=>x.name===n)?.state||'off';items.push({name:n,state:s==='ok'?'ok':s==='crit'?'dropped':'off',why:s==='ok'?'Answering':s==='crit'?'Stopped answering':'Not connected',fix:FIX[n]});});
@@ -915,7 +931,7 @@ async function load(){
   if(!sceneOn){sceneOn=true;initEnv();env.live=true;if(reduce||!$('env'))setInterval(()=>{const m=env.pick();if(m)env.onPulse(m);},4000);}
   env.setGraph(S.graph);if(document.body.classList.contains('map'))buildLabels();
   composeVoice();renderChain();renderDeck();renderIdeas();renderInbox();renderAhead();renderToday();renderPulse();renderSources();renderGoogle();renderLearned();
-  renderPreviews();loadGoogle();loadGoat().then(()=>{renderLenses();refreshConns();});if(!CS.loaded)loadConns().then(()=>{renderLenses();refreshConns();});
+  renderPreviews();loadGoogle().then(loadFeed);loadGoat().then(()=>{renderLenses();refreshConns();});if(!CS.loaded)loadConns().then(()=>{renderLenses();refreshConns();});
   if(/[?&]google=connected/.test(location.search)){history.replaceState(null,'','/');toast('<b>Google connected.</b> Open Plugged in and press Test every service.');}
 }
 const clock=()=>{$('clock').textContent=hhmm(Date.now());tickNow(false);};clock();setInterval(clock,20000);
