@@ -646,14 +646,14 @@ const ROTA=('R,R,R,R,E0700-1600,E0700-1700,L1500-2400,L1500-2400,L1200-2100,E090
 const ROTA_END=new Date(+ROTA_FROM+ROTA.length*DAY);
 const CYC=['R','R','R','R','E0700-1600','E0700-1600','L1500-2400','L1500-2400','L1200-2100','E0900-1800'],CYC0=new Date(2027,1,3);
 const SH_NAME={E:'Early',L:'Late',R:'Rest day'};
-const LEAVE=[new Date(2026,11,21),new Date(2027,0,3)];/* annual leave, told to me by Nathan 26 Nov 2026 */
+const LEAVE=[[new Date(2026,11,21),new Date(2027,0,3),'Annual leave'],[new Date(2027,6,17),new Date(2027,6,28),'Summer holiday']];/* told to me by Nathan 26 Nov 2026 */
 function shiftOn(d){const day=new Date(new Date(d).setHours(0,0,0,0));let code,proj=false;
-  if(day>=LEAVE[0]&&day<=LEAVE[1])return {c:'R',name:'Annual leave',day,leave:true};
+  const lv=LEAVE.find(l=>day>=l[0]&&day<=l[1]);if(lv)return {c:'R',name:lv[2],day,leave:true};
   if(day>=ROTA_FROM&&day<ROTA_END)code=ROTA[Math.round((day-ROTA_FROM)/DAY)];
   else{proj=true;const i=Math.round((day-CYC0)/DAY);code=CYC[((i%10)+10)%10];}
   const c=code[0];if(c==='R')return {c,name:SH_NAME.R,day,proj};
   const h=code.slice(1).split('-');return {c,name:SH_NAME[c],day,proj,start:at(day,+h[0].slice(0,2),+h[0].slice(2)),end:at(day,+h[1].slice(0,2),+h[1].slice(2))};}
-const shiftTxt=s=>s.c==='R'?(s.leave?'Annual leave':'Rest day'):`${s.name} ${hhmm(s.start)}–${hhmm(s.end)}`;
+const shiftTxt=s=>s.c==='R'?(s.leave?s.name:'Rest day'):`${s.name} ${hhmm(s.start)}–${hhmm(s.end)}`;
 function lifeData(){
   const P=(y,mo,d,h,mi,hrs,title,kind,real)=>{const s=new Date(y,mo,d,h,mi);return {title,kind,sample:!real&&kind!=='work',start:s,end:new Date(+s+hrs*36e5)};};
   const plans=[P(2027,2,11,0,0,96,'Kraków with your wife','trip',true),P(2026,10,27,13,30,1,'Call with Richard Kempshall (Davidhorn)','work'),P(2026,10,30,11,0,.5,'RSG exploratory meeting (Martin Jerrold)','work'),P(2026,11,5,19,0,4,'Dinner with friends','social'),
@@ -662,7 +662,7 @@ function lifeData(){
   const presents=[{who:'Your wife (Christmas)',idea:'Weekend away in January, booked as the present',by:new Date(2026,11,15),done:false},
     {who:'Mum and Dad',idea:'Framed family photo and a meal out',by:new Date(2026,11,15),done:false},
     {who:'Work Secret Santa',idea:'£10 limit',by:new Date(2026,11,18),done:false}];
-  return {plans,presents,birthday:new Date(2027,8,2),trip:new Date(2027,2,11),xmas:new Date(2026,11,25)};
+  return {plans,presents,birthday:new Date(2027,8,2),trip:new Date(2027,2,11),summer:new Date(2027,6,17),xmas:new Date(2026,11,25)};
 }
 function clashes(){
   const L=S.life,out=[];
@@ -713,6 +713,15 @@ const LENSES=[
    <article><small>3 · By ${esc(mo(d(45)))}</small><b>Check the paperwork</b><p>Passports valid and under ten years old, travel insurance, and the current UK entry rules for Poland: <a href="https://www.gov.uk/foreign-travel-advice/poland" target="_blank" rel="noopener">gov.uk Poland travel advice</a>.</p></article>
    <article><small>4 · By ${esc(mo(d(14)))}</small><b>Plan the days</b><p>March is cold, about 0 to 8 degrees. Book Wawel Castle tickets and a table for one dinner ahead. Auschwitz-Birkenau needs tickets weeks ahead.</p></article></div>
    <p class="fix">The ideas are my suggestions. Tell me what you two enjoy and I will build the days around it.</p>`;}},
+ {id:'summer',title:'Summer holiday',sample:false,score:()=>{const d=days(S.life.summer);return d<0?0:d<=60?72:d<=150?40:24;},
+  why:()=>{const d=days(S.life.summer);return d>150?`${d} days away. Where are you going?`:`${d} days to go`;},
+  preview:()=>`<span class="big">${days(S.life.summer)}<small> days</small></span><span class="row1">17 to 28 July 2027</span><span class="lbl">12 days off. Tell me where and I will plan it</span>`,
+  pane:()=>{const t=S.life.summer,d=n=>new Date(+t-n*DAY),mo=x=>x.toLocaleDateString('en-GB',{day:'numeric',month:'long',timeZone:TZ});
+   return `<header><h2>Summer holiday</h2><div class="meta">Sat 17 to Wed 28 July 2027 <span class="real">Dates from you</span></div></header>
+   <div class="plan3"><article><small>1 · Now</small><b>Is the leave approved?</b><p>Tell me when it is and I will mark it as confirmed. Until then, the same early request advice applies: ask first and ask early.</p></article>
+   <article><small>2 · By ${esc(mo(d(150)))}</small><b>Choose where</b><p>Twelve days is long enough for abroad. Tell me the kind of trip you want, a budget, and who is coming, and I will give you three options.</p></article>
+   <article><small>3 · By ${esc(mo(d(120)))}</small><b>Book flights and stay</b><p>July is peak season, so prices climb steadily. Booking four months out usually beats waiting.</p></article>
+   <article><small>4 · By ${esc(mo(d(14)))}</small><b>Before you go</b><p>Passports and insurance, an out-of-office I draft for you, and a list of what can wait until you are back. I can hold the non-urgent emails and flag only the urgent ones.</p></article></div>`;}},
  {id:'xmas',title:'Christmas',sample:true,score:()=>{const d=days(S.life.xmas);if(d<0||d>50)return 0;const left=S.life.presents.filter(p=>!p.done).length;return 40+(50-d)*.6+left*4;},
   why:()=>{const left=S.life.presents.filter(p=>!p.done).length;return `${days(S.life.xmas)} days, ${left} present${left===1?'':'s'} to sort`;},
   preview:()=>{const P=S.life.presents,done=P.filter(p=>p.done).length,s=shiftOn(S.life.xmas);return `<span class="big">${days(S.life.xmas)}<small> days</small></span><span class="row1">${done} of ${P.length} presents sorted</span><span class="lbl">Christmas Day: ${esc(shiftTxt(s))}</span>`;},
