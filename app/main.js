@@ -527,7 +527,8 @@ function renderSources(){
 /* ---------- Google: connect once, then test each service. Summaries only, nothing is sent ---------- */
 const GOOG={s:null,busy:false};
 async function loadGoogle(){try{GOOG.s=await api('/api/google/status');}catch(e){GOOG.s={error:e.message};}
-  const c=CONNECT[0];if(GOOG.s&&GOOG.s.connected)c.live='ok';else delete c.live;renderGoogle();}
+  const c=CONNECT[0];if(GOOG.s&&GOOG.s.connected)c.live='ok';else delete c.live;renderGoogle();
+  const g=GOOG.s;if(g&&g.connected&&!GOOG.auto&&(!g.test||Date.now()-new Date(g.test.at)>216e5)){GOOG.auto=true;try{const r=await api('/api/google/test',{});g.test={at:r.at,results:r.results};g.refused=false;}catch(e){g.refused=true;}GOOG.auto=false;renderGoogle();if(typeof renderLenses==='function'&&S.graph){renderLenses();refreshConns();}}}
 function renderGoogle(){
   const host=$('goog');if(!host)return;const g=GOOG.s;
   if(!g){host.innerHTML='';return;}
@@ -705,7 +706,7 @@ const days=d=>Math.ceil((new Date(d).setHours(0,0,0,0)-new Date().setHours(0,0,0
 const strip=(n=10)=>`<span class="shs">${Array.from({length:n},(_,i)=>{const s=shiftOn(Date.now()+i*DAY);return `<i class="s${s.c} ${i?'':'now'}"><b>${s.c==='R'?'':s.c}</b><small>${new Date(Date.now()+i*DAY).toLocaleDateString('en-GB',{weekday:'narrow'})}</small></i>`;}).join('')}</span>`;
 
 const LENSES=[
- {id:'clash',title:'Clashes',sample:true,mixed:true,score:()=>{const c=S.clash;return c.some(x=>x.level==='clash')?96:c.length?72:0;},
+ {id:'clash',type:'urgent',title:'Clashes',sample:true,mixed:true,score:()=>{const c=S.clash;return c.some(x=>x.level==='clash')?96:c.length?72:0;},
   why:()=>{const c=S.clash.find(x=>x.level==='clash')||S.clash[0];return c?`${c.p.title} vs your ${c.s.name.toLowerCase()} shift`:'';},
   preview:()=>{const c=S.clash,n=c.filter(x=>x.level==='clash').length;const f=c[0];
     return `<span class="big ${n?'crit':''}">${c.length}</span><span class="row1">${n} clash${n===1?'':'es'}, ${c.length-n} tight</span><span class="lbl">Next: ${esc(f?shortDay(f.p.start)+' · '+f.p.title:'')}</span>`;},
@@ -713,7 +714,7 @@ const LENSES=[
    <div class="clist">${S.clash.map((c,i)=>`<article class="cl ${c.level}"><div class="cl-h"><b>${esc(c.level==='clash'?'Clash':'Tight')}</b><span>${esc(dayLabel(c.p.start))}</span></div>
    <h3>${esc(c.p.title)} <small>${c.multi?esc(shortDay(c.p.start)+' to '+shortDay(new Date(+c.p.end-DAY))):hhmm(c.p.start)+'–'+hhmm(c.p.end)}</small>${c.p.sample?' <span class="sample">Sample</span>':' <span class="real">From your calendar</span>'}</h3><p>${esc(c.why)}</p><p class="fix">${esc(c.fix)}</p>
    ${c.p.kind==='work'?'':`<button type="button" class="act" data-draft="${i}">${c.multi?'Draft a leave request':'Draft a swap request'}</button>`}<div class="drafted" id="swap-${i}" hidden></div></article>`).join('')||'<p class="empty">No clashes in the next month.</p>'}</div>`},
- {id:'birthday',title:"Wife's birthday",sample:false,score:()=>{const d=days(S.life.birthday);return d<0?0:d<=14?88:d<=30?62:d<=90?36:14;},
+ {id:'birthday',type:'personal',title:"Wife's birthday",sample:false,score:()=>{const d=days(S.life.birthday);return d<0?0:d<=14?88:d<=30?62:d<=90?36:14;},
   why:()=>{const d=days(S.life.birthday);return d>120?`Plenty of time. I'd start planning in ${new Date(+S.life.birthday-90*DAY).toLocaleDateString('en-GB',{month:'long',timeZone:TZ})}`:`${d} days to go`;},
   preview:()=>{const b=S.life.birthday,d=days(b),s=shiftOn(b);return `<span class="big">${d}<small> days</small></span><span class="row1">${esc(shortDay(b))} 2027 · ${esc(s.proj?'rota not out yet':shiftTxt(s))}</span><span class="lbl">Start planning ${esc(new Date(+b-90*DAY).toLocaleDateString('en-GB',{month:'long',timeZone:TZ}))}. Leave, gift, table</span>`;},
   pane:()=>{const b=S.life.birthday,s=shiftOn(b),d=n=>new Date(+b-n*DAY);const mo=x=>x.toLocaleDateString('en-GB',{day:'numeric',month:'long',timeZone:TZ});
@@ -723,7 +724,7 @@ const LENSES=[
    <article><small>3 · By ${esc(mo(d(45)))}</small><b>Book the evening</b><p>Table for two or a weekend away. Popular places go six weeks ahead. A Thursday is a quieter night to book.</p></article>
    <article><small>4 · By ${esc(mo(d(10)))}</small><b>Card, flowers, wrap</b><p>I'll remind you ten days before so the delivery isn't left to the last minute.</p></article></div>
    <p class="fix">I'll keep the day on my radar and raise it again in ${esc(new Date(+b-90*DAY).toLocaleDateString('en-GB',{month:'long',timeZone:TZ}))}. Tell me what she likes and I'll turn it into present ideas.</p>`;}},
- {id:'trip',title:'Kraków',sample:false,score:()=>{const d=days(S.life.trip);if(d<0)return 0;const bad=S.clash.some(x=>x.multi);return Math.min(80,(d<=120?44:24)+(bad?30:0));},
+ {id:'trip',type:'personal',title:'Kraków',sample:false,score:()=>{const d=days(S.life.trip);if(d<0)return 0;const bad=S.clash.some(x=>x.multi);return Math.min(80,(d<=120?44:24)+(bad?30:0));},
   why:()=>{const bad=S.clash.find(x=>x.multi);return bad?'Not yet covered by leave':`${days(S.life.trip)} days to go`;},
   preview:()=>{const bad=S.clash.find(x=>x.multi),n=bad?bad.why.match(/work (\d+)/)[1]:0;return `<span class="big">${days(S.life.trip)}<small> days</small></span><span class="row1">11 to 14 March, with your wife</span><span class="lbl ${bad?'crit':''}">${bad?'You are due to work '+n+' of the 4 days. Request leave':'Leave is sorted'}</span>`;},
   pane:()=>{const t=S.life.trip,d=n=>new Date(+t-n*DAY),mo=x=>x.toLocaleDateString('en-GB',{day:'numeric',month:'long',timeZone:TZ}),bad=S.clash.find(x=>x.multi);
@@ -733,7 +734,7 @@ const LENSES=[
    <article><small>3 · By ${esc(mo(d(45)))}</small><b>Check the paperwork</b><p>Passports valid and under ten years old, travel insurance, and the current UK entry rules for Poland: <a href="https://www.gov.uk/foreign-travel-advice/poland" target="_blank" rel="noopener">gov.uk Poland travel advice</a>.</p></article>
    <article><small>4 · By ${esc(mo(d(14)))}</small><b>Plan the days</b><p>March is cold, about 0 to 8 degrees. Book Wawel Castle tickets and a table for one dinner ahead. Auschwitz-Birkenau needs tickets weeks ahead.</p></article></div>
    <p class="fix">The ideas are my suggestions. Tell me what you two enjoy and I will build the days around it.</p>`;}},
- {id:'summer',title:'Summer holiday',sample:false,score:()=>{const d=days(S.life.summer);return d<0?0:d<=60?72:d<=150?40:24;},
+ {id:'summer',type:'personal',title:'Summer holiday',sample:false,score:()=>{const d=days(S.life.summer);return d<0?0:d<=60?72:d<=150?40:24;},
   why:()=>{const d=days(S.life.summer);return d>150?`${d} days away. Where are you going?`:`${d} days to go`;},
   preview:()=>`<span class="big">${days(S.life.summer)}<small> days</small></span><span class="row1">17 to 28 July 2027</span><span class="lbl">12 days off. Tell me where and I will plan it</span>`,
   pane:()=>{const t=S.life.summer,d=n=>new Date(+t-n*DAY),mo=x=>x.toLocaleDateString('en-GB',{day:'numeric',month:'long',timeZone:TZ});
@@ -742,14 +743,14 @@ const LENSES=[
    <article><small>2 · By ${esc(mo(d(150)))}</small><b>Choose where</b><p>Twelve days is long enough for abroad. Tell me the kind of trip you want, a budget, and who is coming, and I will give you three options.</p></article>
    <article><small>3 · By ${esc(mo(d(120)))}</small><b>Book flights and stay</b><p>July is peak season, so prices climb steadily. Booking four months out usually beats waiting.</p></article>
    <article><small>4 · By ${esc(mo(d(14)))}</small><b>Before you go</b><p>Passports and insurance, an out-of-office I draft for you, and a list of what can wait until you are back. I can hold the non-urgent emails and flag only the urgent ones.</p></article></div>`;}},
- {id:'xmas',title:'Christmas',sample:true,score:()=>{const d=days(S.life.xmas);if(d<0||d>50)return 0;const left=S.life.presents.filter(p=>!p.done).length;return 40+(50-d)*.6+left*4;},
+ {id:'xmas',type:'personal',title:'Christmas',sample:true,score:()=>{const d=days(S.life.xmas);if(d<0||d>50)return 0;const left=S.life.presents.filter(p=>!p.done).length;return 40+(50-d)*.6+left*4;},
   why:()=>{const left=S.life.presents.filter(p=>!p.done).length;return `${days(S.life.xmas)} days, ${left} present${left===1?'':'s'} to sort`;},
   preview:()=>{const P=S.life.presents,done=P.filter(p=>p.done).length,s=shiftOn(S.life.xmas);return `<span class="big">${days(S.life.xmas)}<small> days</small></span><span class="row1">${done} of ${P.length} presents sorted</span><span class="lbl">Christmas Day: ${esc(shiftTxt(s))}</span>`;},
   pane:()=>{const P=S.life.presents,r=restDays(Date.now(),new Date(2026,11,15));
    return `<header><h2>Christmas</h2><div class="meta">${days(S.life.xmas)} days · order online by Tue 15 Dec to be safe <span class="sample">Sample</span></div></header>
    <div class="plist">${P.map(p=>`<article><div><b>${esc(p.who)}</b><p>${esc(p.idea)}</p></div><span class="by ${days(p.by)<7?'crit':''}">by ${esc(shortDay(p.by))}</span></article>`).join('')}</div>
    <p class="fix">Shopping days that are already rest days: ${r.map(shortDay).map(esc).join(', ')}. I'd do it all on ${esc(r[0]?shortDay(r[0]):'your next rest day')}.</p>`;}},
- {id:'shifts',title:'Shifts and days off',sample:false,score:()=>{const t=shiftOn(Date.now());return t.c==='R'?52:66;},
+ {id:'shifts',type:'work',title:'Shifts and days off',sample:false,score:()=>{const t=shiftOn(Date.now());return t.c==='R'?52:66;},
   why:()=>{const t=shiftOn(Date.now());return t.c==='R'?'Rest day today':`${t.name} today, rest from ${shortDay(nextRest(Date.now()))}`;},
   preview:()=>{const t=shiftOn(Date.now());return `${strip(10)}<span class="row1"><b>Today</b> ${esc(shiftTxt(t))}</span><span class="lbl">Next rest day ${esc(shortDay(nextRest(Date.now())))}</span>`;},
   pane:()=>{const start=new Date();start.setHours(0,0,0,0);start.setDate(start.getDate()-((start.getDay()+6)%7));
@@ -758,7 +759,7 @@ const LENSES=[
    return `<header><h2>Shifts and days off</h2><div class="meta">Sussex RIT D, from Section Shifts <span class="real">Real</span></div></header>
    <div class="roster"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>${cells}</div>
    <p class="fix">Red outline: a plan clashes with a shift. Rota published to 31 January; later weeks follow the same ten-day cycle. It excludes leave, bank holidays and rest days in lieu, so check the official system before committing. <a href="${ROTA_SRC}" target="_blank" rel="noopener">Open Section Shifts</a></p>`;}},
- {id:'plans',title:'Plans',sample:true,score:()=>S.life.plans.filter(p=>p.start>Date.now()&&days(p.start)<=21).length?44:0,
+ {id:'plans',type:'personal',title:'Plans',sample:true,score:()=>S.life.plans.filter(p=>p.start>Date.now()&&days(p.start)<=21).length?44:0,
   why:()=>'Social and family, next three weeks',
   preview:()=>{const n=S.life.plans.filter(p=>p.start>Date.now());const f=n[0];const bad=new Set(S.clash.map(c=>c.p));return `<span class="big">${n.filter(p=>days(p.start)<=31).length}</span><span class="row1">${esc(f?f.title:'')}</span><span class="lbl">${esc(f?shortDay(f.start):'')}${f&&bad.has(f)?' · clashes with a shift':''}</span>`;},
   pane:()=>{const bad=new Map(S.clash.map(c=>[c.p,c]));return `<header><h2>Plans</h2><div class="meta">Social and family <span class="sample">Sample</span></div></header>
@@ -775,6 +776,69 @@ const CORE={
  'sources-sec':()=>[CONNECT.some(c=>connState(c)!=='ok')?36:18,'Connect the rest'],
  'learn-sec':()=>[20,'What I have learned from you'],
 };
+
+/* ---------- connections lens: every plug-in, its health, and what you can do with it ---------- */
+const CS={rows:{},loaded:false,open:null,busy:null};
+async function loadConns(){try{const r=await api('/api/conns');CS.rows=Object.fromEntries((r.rows||[]).map(x=>[x.name,x]));CS.loaded=true;}catch(e){}}
+async function saveConn(name,status,note){try{const r=await api('/api/conns',{name,status:status||null,note:note??null});CS.rows=Object.fromEntries((r.rows||[]).map(x=>[x.name,x]));}catch(e){toast(`<b>Not saved.</b> ${esc(e.message)}`);}}
+const FIX={
+ Google:[['Connect again','/connect/google'],['Google permissions','https://myaccount.google.com/permissions'],['Turn APIs on','https://console.cloud.google.com/apis/library']],
+ GitHub:[['Make a new token','https://github.com/settings/tokens'],['Where I keep it',CF_SECRETS]],
+ Cloudflare:[['Make a new token','https://dash.cloudflare.com/profile/api-tokens'],['Where I keep it',CF_SECRETS]],
+ Supabase:[['Make a new token','https://supabase.com/dashboard/account/tokens'],['Where I keep it',CF_SECRETS]],
+ 'Your sites':[['Cloudflare DNS','https://dash.cloudflare.com/'],['Search Console','https://search.google.com/search-console']]};
+function connItems(){
+  const N=nodeStates(),h=health(),g=GOOG.s,items=[];
+  const gOk=g&&g.connected,gBad=gOk&&g.test&&(g.test.results||[]).filter(r=>!r.ok);
+  items.push({name:'Google',state:!g||g.error?'off':!gOk?'off':(gBad&&gBad.length)||g.refused?'dropped':'ok',
+    why:!gOk?'Not connected yet':gBad&&gBad.length?`${gBad.map(r=>r.name).join(', ')} not answering`:g.refused?'Google refused the saved login':'Gmail, Calendar, Search Console, Drive',fix:FIX.Google});
+  ['GitHub','Cloudflare','Supabase'].forEach(n=>{const s=N.find(x=>x.name===n)?.state||'off';items.push({name:n,state:s==='ok'?'ok':s==='crit'?'dropped':'off',why:s==='ok'?'Answering':s==='crit'?'Stopped answering':'Not connected',fix:FIX[n]});});
+  items.push({name:'Your sites',state:h.bad.length?'dropped':'ok',why:h.bad.length?`${h.bad.length} of ${h.sites.length} not answering`:`${h.sites.length} sites answering`,fix:FIX['Your sites']});
+  CONNECT.slice(1).forEach(c=>{const st=connState(c);items.push({name:c.name,state:st==='ok'?'ok':'off',why:c.steps.length?`Not connected. ${c.time||''}`.trim():'No route in',fix:(c.steps||[]).filter(s=>s[1]).slice(0,2).map(s=>[s[0].slice(0,34)+(s[0].length>34?'…':''),s[1]])});});
+  return items.map(i=>{const r=CS.rows[i.name];const own=r&&r.status;return {...i,own,note:r&&r.note||'',eff:own==='paused'||own==='archived'||own==='deleted'?own:i.state};});
+}
+const CST={ok:'Working',dropped:'Dropped out',off:'Not connected',paused:'Paused',archived:'Archived',deleted:'Deleted'};
+function connPane(){
+  const it=connItems(),live=it.filter(i=>!['archived','deleted'].includes(i.own)),arch=it.filter(i=>i.own==='archived'),del=it.filter(i=>i.own==='deleted');
+  const row=i=>{const bad=i.eff==='dropped';const open=CS.open===i.name;
+    return `<article class="cn ${i.eff}"><div class="ch"><i></i><b>${esc(i.name)}</b><em>${esc(CST[i.eff])}</em></div>
+    <p>${esc(i.eff==='paused'?'Paused. I will not alert you about it':i.why)}${i.note?` <span class="cnote">${esc(i.note)}</span>`:''}</p>
+    ${bad||i.eff==='off'?`<div class="cfix">${i.fix.map(f=>`<a href="${esc(f[1])}" ${f[1][0]==='/'?'':'target="_blank" rel="noopener"'}>${esc(f[0])}</a>`).join('')}</div>`:''}
+    <div class="cact">${i.own==='archived'||i.own==='deleted'?`<button type="button" data-ca="restore" data-n="${esc(i.name)}">Restore</button>`:
+      `<button type="button" data-ca="test" data-n="${esc(i.name)}"${CS.busy===i.name?' disabled':''}>${CS.busy===i.name?'Testing…':'Test'}</button>
+      <button type="button" data-ca="${i.own==='paused'?'resume':'pause'}" data-n="${esc(i.name)}">${i.own==='paused'?'Resume':'Pause'}</button>
+      <button type="button" data-ca="reset" data-n="${esc(i.name)}">Reset</button>
+      <button type="button" data-ca="amend" data-n="${esc(i.name)}">Amend</button>
+      <button type="button" data-ca="archive" data-n="${esc(i.name)}">Archive</button>
+      <button type="button" data-ca="delete" data-n="${esc(i.name)}">Delete</button>`}</div>
+    ${open?`<div class="cam"><input type="text" maxlength="140" value="${esc(i.note)}" placeholder="A note: which account, what it is for" id="cn-in"><button type="button" data-ca="save" data-n="${esc(i.name)}">Save</button></div>`:''}</article>`;};
+  const bad=it.filter(i=>i.eff==='dropped').length;
+  return `<header><h2>Connections</h2><div class="meta">${bad?`${bad} dropped out`:'All answering'}</div></header>
+  <p class="sub2">I check these every few minutes. If one drops out it moves to the top with the link to fix it.</p>
+  <div class="cl2">${live.map(row).join('')}</div>
+  ${arch.length?`<h3 class="ch3">Archived</h3><div class="cl2">${arch.map(row).join('')}</div>`:''}
+  ${del.length?`<h3 class="ch3">Deleted</h3><div class="cl2">${del.map(row).join('')}</div>`:''}`;
+}
+LENSES.push({id:'conns',type:'system',title:'Connections',sample:false,
+  score:()=>{const it=connItems();return it.some(i=>i.eff==='dropped')?93:it.some(i=>i.eff==='off')?26:20;},
+  why:()=>{const it=connItems(),b=it.filter(i=>i.eff==='dropped');return b.length?`${b.map(i=>i.name).join(' and ')} dropped out`:`${it.filter(i=>i.eff==='ok').length} of ${it.length} working`;},
+  preview:()=>{const b=connItems().filter(i=>i.eff==='dropped').length;return `<span class="big">${b?b:'OK'}</span>`;},
+  pane:connPane});
+LENSES.find(l=>l.id==='conns').urgentWhen=()=>connItems().some(i=>i.eff==='dropped');
+function refreshConns(){const s=$('lens-conns');if(s)s.innerHTML=connPane();const t=document.querySelector('[data-lens="conns"]');if(t){const L=LENSES.find(l=>l.id==='conns');t.querySelector('.tp').innerHTML=L.preview();const w=t.querySelector('.lwhy');if(w)w.textContent=L.why();}}
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-ca]');if(!b)return;const n=b.dataset.n,a=b.dataset.ca;
+  if(a==='test'){CS.busy=n;refreshConns();
+    if(n==='Google'){try{const r=await api('/api/google/test',{});GOOG.s.test={at:r.at,results:r.results};GOOG.s.refused=false;}catch(er){GOOG.s.refused=true;toast(`<b>Google test failed.</b> ${esc(er.message)}`);}renderGoogle();}
+    else{try{await load();}catch(er){}}
+    CS.busy=null;renderLenses();refreshConns();const it=connItems().find(i=>i.name===n);if(it)toast(`<b>${esc(n)}:</b> ${esc(CST[it.eff].toLowerCase())}${it.eff==='dropped'?'. The fix links are on the card.':'.'}`);return;}
+  if(a==='amend'){CS.open=CS.open===n?null:n;refreshConns();const i=$('cn-in');if(i)i.focus();return;}
+  if(a==='save'){await saveConn(n,CS.rows[n]?.status,$('cn-in').value.trim());CS.open=null;refreshConns();return;}
+  if(a==='delete'&&!b.dataset.sure){b.dataset.sure='1';b.textContent=n==='Google'?'Tap again: disconnect':'Tap again to delete';return;}
+  if(a==='delete'&&n==='Google'){try{await api('/api/google/disconnect',{});GOOG.s=await api('/api/google/status');delete CONNECT[0].live;renderGoogle();}catch(er){toast(`<b>Not disconnected.</b> ${esc(er.message)}`);return;}}
+  if(a==='reset'&&n==='Google'){location.href='/connect/google';return;}
+  const map={pause:'paused',resume:null,archive:'archived',delete:'deleted',restore:null,reset:null};
+  await saveConn(n,map[a],a==='reset'?'':undefined);renderLenses();refreshConns();});
+
 function renderLenses(){
   S.life=S.life||lifeData();S.clash=clashes();
   const board=$('board'),panes=$('panes');
@@ -787,7 +851,7 @@ function renderLenses(){
     t.querySelector('.tp').innerHTML=L.preview();t._score=L.score();t._why=L.why();});
   board.querySelectorAll('.tile:not(.lens):not(#brief)').forEach(t=>{const k=t.id==='map-open'?'map':t.dataset.pane;const f=CORE[k];if(f){const [sc,w]=f();t._score=sc;t._why=w;}else t._score=-1;});
   const all=[...board.querySelectorAll('.tile:not(#brief)')].filter(t=>t._score>=0).sort((a,b)=>b._score-a._score);
-  all.forEach((t,i)=>{t.hidden=t._score<=0;t.classList.toggle('hero',i===0);t.classList.toggle('span2',i===0||t.id==='map-open'||t.classList.contains('t-pulse'));t.classList.remove('rows2');
+  all.forEach((t,i)=>{t.hidden=t._score<=0;const L0=LENSES.find(l=>l.id===t.dataset.lens);const ty=L0?(L0.urgentWhen&&L0.urgentWhen()?'urgent':L0.type):t.dataset.type;if(ty)t.dataset.type=t.dataset.pane==='focus-sec'&&!S.items.some(x=>x.level==='urgent')?'work':ty;t.classList.toggle('lg',i>0&&t._score>=60);t.classList.toggle('sm',t._score<30);t.classList.toggle('hero',i===0);t.classList.toggle('span2',i===0||t._score>=60);t.classList.remove('rows2');
     let w=t.querySelector(':scope>.lwhy');if(!w){w=document.createElement('span');w.className='lwhy';t.querySelector('.tk').after(w);}w.textContent=t._why||'';
     t.setAttribute('aria-label',t.querySelector('.tk').textContent.replace('Sample','').trim()+'. '+(t._why||''));board.appendChild(t);});
 }
@@ -835,7 +899,7 @@ async function load(){
   if(!sceneOn){sceneOn=true;initEnv();env.live=true;if(reduce||!$('env'))setInterval(()=>{const m=env.pick();if(m)env.onPulse(m);},4000);}
   env.setGraph(S.graph);if(document.body.classList.contains('map'))buildLabels();
   composeVoice();renderChain();renderDeck();renderIdeas();renderInbox();renderAhead();renderToday();renderPulse();renderSources();renderGoogle();renderLearned();
-  renderPreviews();loadGoogle();
+  renderPreviews();loadGoogle();if(!CS.loaded)loadConns().then(()=>{renderLenses();refreshConns();});
   if(/[?&]google=connected/.test(location.search)){history.replaceState(null,'','/');toast('<b>Google connected.</b> Open Plugged in and press Test every service.');}
 }
 const clock=()=>{$('clock').textContent=hhmm(Date.now());tickNow(false);};clock();setInterval(clock,20000);
