@@ -655,18 +655,23 @@ function shiftOn(d){const day=new Date(new Date(d).setHours(0,0,0,0));let code,p
   const h=code.slice(1).split('-');return {c,name:SH_NAME[c],day,proj,start:at(day,+h[0].slice(0,2),+h[0].slice(2)),end:at(day,+h[1].slice(0,2),+h[1].slice(2))};}
 const shiftTxt=s=>s.c==='R'?(s.leave?'Annual leave':'Rest day'):`${s.name} ${hhmm(s.start)}–${hhmm(s.end)}`;
 function lifeData(){
-  const P=(y,mo,d,h,mi,hrs,title,kind)=>{const s=new Date(y,mo,d,h,mi);return {title,kind,sample:kind!=='work',start:s,end:new Date(+s+hrs*36e5)};};
-  const plans=[P(2026,10,27,13,30,1,'Call with Richard Kempshall (Davidhorn)','work'),P(2026,10,30,11,0,.5,'RSG exploratory meeting (Martin Jerrold)','work'),P(2026,11,5,19,0,4,'Dinner with friends','social'),
+  const P=(y,mo,d,h,mi,hrs,title,kind,real)=>{const s=new Date(y,mo,d,h,mi);return {title,kind,sample:!real&&kind!=='work',start:s,end:new Date(+s+hrs*36e5)};};
+  const plans=[P(2027,2,11,0,0,96,'Kraków with your wife','trip',true),P(2026,10,27,13,30,1,'Call with Richard Kempshall (Davidhorn)','work'),P(2026,10,30,11,0,.5,'RSG exploratory meeting (Martin Jerrold)','work'),P(2026,11,5,19,0,4,'Dinner with friends','social'),
     P(2026,11,12,10,0,6,'Christmas shopping','errand'),P(2026,11,19,19,30,4,'Christmas drinks with friends','social'),
     P(2026,11,25,13,0,5,'Christmas dinner at home','family'),P(2026,11,31,20,0,5,"New Year's Eve",'social')];
   const presents=[{who:'Your wife (Christmas)',idea:'Weekend away in January, booked as the present',by:new Date(2026,11,15),done:false},
     {who:'Mum and Dad',idea:'Framed family photo and a meal out',by:new Date(2026,11,15),done:false},
     {who:'Work Secret Santa',idea:'£10 limit',by:new Date(2026,11,18),done:false}];
-  return {plans,presents,birthday:new Date(2027,8,2),xmas:new Date(2026,11,25)};
+  return {plans,presents,birthday:new Date(2027,8,2),trip:new Date(2027,2,11),xmas:new Date(2026,11,25)};
 }
 function clashes(){
   const L=S.life,out=[];
   L.plans.forEach(p=>{if(p.end<Date.now())return;
+    if(p.end-p.start>36e5*30){const w=[];for(let t=+p.start;t<+p.end;t+=DAY){const s=shiftOn(t);if(s.c!=='R')w.push(s);}
+      if(w.length){const L2=w.map(s=>`${s.day.toLocaleDateString('en-GB',{weekday:'short',timeZone:TZ})} ${s.name.toLowerCase()}`).join(', ');
+        out.push({p,s:w[0],multi:true,level:'clash',why:`You are due to work ${w.length} of the ${Math.round((p.end-p.start)/DAY)} days: ${L2}.${w.some(s=>s.proj)?' The rota for then is not out yet, so this is the usual cycle projected.':''}`,
+          fix:'Book annual leave for those days now, or swap the shifts. Early requests are the ones that get approved.'});}
+      return;}
     for(const off of [-1,0]){const s=shiftOn(new Date(+p.start+off*DAY));if(s.c==='R')continue;
       if(p.start<s.end&&p.end>s.start){out.push({p,s,level:'clash',why:`You're on ${/^[aeiou]/i.test(s.name)?'an':'a'} ${s.name.toLowerCase()} shift (${hhmm(s.start)}–${hhmm(s.end)}).`,
         fix:p.kind==='work'?'Ask to move it to a rest day ('+shortDay(nextRest(p.start))+') or take the time as leave.':p.kind==='family'?'Ask for a rest-day swap or a few hours of leave now. Christmas and family dates go fast.':'Swap the shift, or move the plan to your next rest day: '+shortDay(nextRest(p.start))+'.'});return;}}
@@ -686,8 +691,8 @@ const LENSES=[
     return `<span class="big ${n?'crit':''}">${c.length}</span><span class="row1">${n} clash${n===1?'':'es'}, ${c.length-n} tight</span><span class="lbl">Next: ${esc(f?shortDay(f.p.start)+' · '+f.p.title:'')}</span>`;},
   pane:()=>`<header><h2>Clashes</h2><div class="meta">Your plans checked against your real rota <span class="sample">Personal plans are samples</span></div></header>
    <div class="clist">${S.clash.map((c,i)=>`<article class="cl ${c.level}"><div class="cl-h"><b>${esc(c.level==='clash'?'Clash':'Tight')}</b><span>${esc(dayLabel(c.p.start))}</span></div>
-   <h3>${esc(c.p.title)} <small>${hhmm(c.p.start)}–${hhmm(c.p.end)}</small>${c.p.sample?' <span class="sample">Sample</span>':' <span class="real">From your calendar</span>'}</h3><p>${esc(c.why)}</p><p class="fix">${esc(c.fix)}</p>
-   ${c.p.kind==='work'?'':`<button type="button" class="act" data-draft="${i}">Draft a swap request</button>`}<div class="drafted" id="swap-${i}" hidden></div></article>`).join('')||'<p class="empty">No clashes in the next month.</p>'}</div>`},
+   <h3>${esc(c.p.title)} <small>${c.multi?esc(shortDay(c.p.start)+' to '+shortDay(new Date(+c.p.end-DAY))):hhmm(c.p.start)+'–'+hhmm(c.p.end)}</small>${c.p.sample?' <span class="sample">Sample</span>':' <span class="real">From your calendar</span>'}</h3><p>${esc(c.why)}</p><p class="fix">${esc(c.fix)}</p>
+   ${c.p.kind==='work'?'':`<button type="button" class="act" data-draft="${i}">${c.multi?'Draft a leave request':'Draft a swap request'}</button>`}<div class="drafted" id="swap-${i}" hidden></div></article>`).join('')||'<p class="empty">No clashes in the next month.</p>'}</div>`},
  {id:'birthday',title:"Wife's birthday",sample:false,score:()=>{const d=days(S.life.birthday);return d<0?0:d<=14?88:d<=30?62:d<=90?36:14;},
   why:()=>{const d=days(S.life.birthday);return d>120?`Plenty of time. I'd start planning in ${new Date(+S.life.birthday-90*DAY).toLocaleDateString('en-GB',{month:'long',timeZone:TZ})}`:`${d} days to go`;},
   preview:()=>{const b=S.life.birthday,d=days(b),s=shiftOn(b);return `<span class="big">${d}<small> days</small></span><span class="row1">${esc(shortDay(b))} 2027 · ${esc(s.proj?'rota not out yet':shiftTxt(s))}</span><span class="lbl">Start planning ${esc(new Date(+b-90*DAY).toLocaleDateString('en-GB',{month:'long',timeZone:TZ}))}. Leave, gift, table</span>`;},
@@ -698,6 +703,16 @@ const LENSES=[
    <article><small>3 · By ${esc(mo(d(45)))}</small><b>Book the evening</b><p>Table for two or a weekend away. Popular places go six weeks ahead. A Thursday is a quieter night to book.</p></article>
    <article><small>4 · By ${esc(mo(d(10)))}</small><b>Card, flowers, wrap</b><p>I'll remind you ten days before so the delivery isn't left to the last minute.</p></article></div>
    <p class="fix">I'll keep the day on my radar and raise it again in ${esc(new Date(+b-90*DAY).toLocaleDateString('en-GB',{month:'long',timeZone:TZ}))}. Tell me what she likes and I'll turn it into present ideas.</p>`;}},
+ {id:'trip',title:'Kraków',sample:false,score:()=>{const d=days(S.life.trip);if(d<0)return 0;const bad=S.clash.some(x=>x.multi);return Math.min(80,(d<=120?44:24)+(bad?30:0));},
+  why:()=>{const bad=S.clash.find(x=>x.multi);return bad?'Not yet covered by leave':`${days(S.life.trip)} days to go`;},
+  preview:()=>{const bad=S.clash.find(x=>x.multi),n=bad?bad.why.match(/work (\d+)/)[1]:0;return `<span class="big">${days(S.life.trip)}<small> days</small></span><span class="row1">11 to 14 March, with your wife</span><span class="lbl ${bad?'crit':''}">${bad?'You are due to work '+n+' of the 4 days. Request leave':'Leave is sorted'}</span>`;},
+  pane:()=>{const t=S.life.trip,d=n=>new Date(+t-n*DAY),mo=x=>x.toLocaleDateString('en-GB',{day:'numeric',month:'long',timeZone:TZ}),bad=S.clash.find(x=>x.multi);
+   return `<header><h2>Kraków</h2><div class="meta">Thu 11 to Sun 14 March 2027 <span class="real">Dates from you</span></div></header>
+   <div class="plan3"><article><small>1 · This week</small><b>${bad?'Request the leave':'Leave is covered'}</b><p>${esc(bad?bad.why:'Nothing on your rota clashes.')} ${bad?'I have a request drafted in Clashes, ready for you to send.':''}</p></article>
+   <article><small>2 · By ${esc(mo(d(70)))}</small><b>Flights and hotel</b><p>Compare direct flights from your nearest airport. Book once leave is agreed. Stay near the Old Town to walk everywhere.</p></article>
+   <article><small>3 · By ${esc(mo(d(45)))}</small><b>Check the paperwork</b><p>Passports valid and under ten years old, travel insurance, and the current UK entry rules for Poland: <a href="https://www.gov.uk/foreign-travel-advice/poland" target="_blank" rel="noopener">gov.uk Poland travel advice</a>.</p></article>
+   <article><small>4 · By ${esc(mo(d(14)))}</small><b>Plan the days</b><p>March is cold, about 0 to 8 degrees. Book Wawel Castle tickets and a table for one dinner ahead. Auschwitz-Birkenau needs tickets weeks ahead.</p></article></div>
+   <p class="fix">The ideas are my suggestions. Tell me what you two enjoy and I will build the days around it.</p>`;}},
  {id:'xmas',title:'Christmas',sample:true,score:()=>{const d=days(S.life.xmas);if(d<0||d>50)return 0;const left=S.life.presents.filter(p=>!p.done).length;return 40+(50-d)*.6+left*4;},
   why:()=>{const left=S.life.presents.filter(p=>!p.done).length;return `${days(S.life.xmas)} days, ${left} present${left===1?'':'s'} to sort`;},
   preview:()=>{const P=S.life.presents,done=P.filter(p=>p.done).length,s=shiftOn(S.life.xmas);return `<span class="big">${days(S.life.xmas)}<small> days</small></span><span class="row1">${done} of ${P.length} presents sorted</span><span class="lbl">Christmas Day: ${esc(shiftTxt(s))}</span>`;},
@@ -748,6 +763,7 @@ function renderLenses(){
     t.setAttribute('aria-label',t.querySelector('.tk').textContent.replace('Sample','').trim()+'. '+(t._why||''));board.appendChild(t);});
 }
 document.addEventListener('click',e=>{const b=e.target.closest('[data-draft]');if(!b)return;const c=S.clash[+b.dataset.draft];if(!c)return;const box=$('swap-'+b.dataset.draft);
+  box.hidden=false;if(c.multi){box.textContent=`Hi Sarge, I would like to request annual leave from ${dayLabel(c.p.start)} to ${dayLabel(new Date(+c.p.end-DAY))} for a trip abroad with my wife. I am asking early so it can be planned around. Please let me know if you need anything else from me. Thanks.`;b.textContent='Drafted. Nothing is sent';b.disabled=true;return;}
   box.hidden=false;box.textContent=`Hi Sarge, could I swap my ${c.s.name.toLowerCase()} shift on ${dayLabel(c.s.day)} for one of my rest days? I have ${c.p.kind==='family'?'a family commitment':'plans I can\'t move'} (${c.p.title.toLowerCase()}). Happy to cover a shift in return. Thanks.`;
   b.textContent='Drafted. Sample: nothing is sent';b.disabled=true;});
 
