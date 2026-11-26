@@ -9,6 +9,8 @@ const shortDay=d=>new Date(d).toLocaleDateString('en-GB',{weekday:'short',day:'n
 const ago=d=>{const m=Math.round((Date.now()-new Date(d))/60000);if(m<1)return 'just now';if(m<60)return m+' min ago';const h=Math.round(m/60);if(h<24)return h+' h ago';return Math.round(h/24)+' days ago';};
 const parse=s=>{try{return JSON.parse(s||'null')}catch{return null}};
 const fmt=n=>Number(n).toLocaleString('en-GB');
+const GOAT={sites:null};
+async function loadGoat(){try{const r=await api('/api/goat/status');GOAT.sites=r.sites||[];}catch(e){}}
 async function api(path,body){
   const r=await fetch(path,body===undefined?{credentials:'same-origin'}:{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   if(r.status===401){location.replace('/login');throw Error('Signed out');}
@@ -68,7 +70,7 @@ function sampleData(){
 const S={data:null,brief:null,conn:null,items:[],dismissed:new Set(),learning:null,sample:sampleData(),deckI:0};
 try{JSON.parse(localStorage.getItem('tt-dismissed')||'[]').forEach(x=>S.dismissed.add(x));}catch{}
 const saveDismissed=()=>{try{localStorage.setItem('tt-dismissed',JSON.stringify([...S.dismissed].slice(-80)));}catch{}};
-const NODE_OF={assets:'Supabase',tasks:'GitHub',seo:'Analytics',finance:'Finance',monitor:'Cloudflare',research:'GitHub',services:'Cloudflare'};
+const NODE_OF={assets:'Supabase',tasks:'GitHub',seo:'GoatCounter',finance:'Finance',monitor:'Cloudflare',research:'GitHub',services:'Cloudflare'};
 
 /* ---------- merge items that are the same job in different places ---------- */
 const STOP=new Set('the a an of and to for in on by with your our is are'.split(' '));
@@ -116,7 +118,7 @@ function health(){
 }
 function nodeStates(){
   const h=health();const st=n=>{const s=h.src.find(x=>x.name===n);return !s?'off':s.status==='ok'?'ok':s.status==='error'?'crit':'off';};
-  return [{name:'Gmail',state:'sample'},{name:'Calendar',state:'sample'},{name:'Analytics',state:'sample'},{name:'GitHub',state:st('GitHub')},
+  return [{name:'Gmail',state:'sample'},{name:'Calendar',state:'sample'},{name:'GoatCounter',state:GOAT.sites==null||!GOAT.sites.length?'off':GOAT.sites.some(x=>!x.ok)?'crit':'ok'},{name:'GitHub',state:st('GitHub')},
     {name:'Cloudflare',state:st('Cloudflare')},{name:'Supabase',state:st('Supabase')},{name:'LinkedIn',state:'sample'},{name:'Finance',state:'off'}];
 }
 
@@ -262,8 +264,8 @@ function renderPulse(){
   const avg=ms.length?Math.round(ms.slice(-6).reduce((a,b)=>a+b,0)/Math.min(6,ms.length)):null;
   const tapNow=52,tapPrev=30;const slow=h.sites.filter(x=>x.ms!=null).sort((a,b)=>b.ms-a.ms)[0];const up=[...A.sites].sort((a,b)=>parseFloat(b[2])-parseFloat(a[2]))[0];
   const T=[
-    {k:'Visitors',v:fmt(sess),d:`${sess>=A.prev?'+':''}${Math.round((sess-A.prev)/A.prev*100)}% on last week`,s:A.sessions,sample:true,node:'Analytics',kind:'metric',id:'visitors',ins:`${up[0]} is up ${up[2]}. Interest is rising, so this is the week to give people a reason to book.`},
-    {k:'Search clicks · TAP',v:fmt(tapNow),d:`from ${tapPrev}, previous 4 weeks`,s:[tapPrev,tapNow],node:'Analytics',kind:'metric',id:'search',ins:'Click-through is stuck at 0.9%. Better titles on three pages is the quickest lift.'},
+    {k:'Visitors',v:fmt(sess),d:`${sess>=A.prev?'+':''}${Math.round((sess-A.prev)/A.prev*100)}% on last week`,s:A.sessions,sample:true,node:'GoatCounter',kind:'metric',id:'visitors',ins:`${up[0]} is up ${up[2]}. Interest is rising, so this is the week to give people a reason to book.`},
+    {k:'Search clicks · TAP',v:fmt(tapNow),d:`from ${tapPrev}, previous 4 weeks`,s:[tapPrev,tapNow],node:'GoatCounter',kind:'metric',id:'search',ins:'Click-through is stuck at 0.9%. Better titles on three pages is the quickest lift.'},
     {k:'Site response',v:avg!=null?avg+' ms':'–',d:`${h.sites.length} sites, live checks`,s:ms.slice(-24),node:'Sites',kind:'metric',id:'health',dn:h.bad.length>0,ins:h.bad.length?`${h.bad[0]} is failing. I'm checking it every two hours.`:slow?`Slowest is ${slow.name} at ${slow.ms} ms. Fine for now; I flag anything over a second.`:''},
     {k:So.name+' followers',v:fmt(So.followers),d:`+${So.followers-So.series[0]} this week`,s:So.series,sample:true,node:'LinkedIn',kind:'metric',id:'social',ins:'Your hot-spot policing post reached 3,120. Pair each TAP article with a post.'}];
   $('tiles').innerHTML=T.map((x,i)=>`<button type="button" class="mtile glass" data-i="${i}"><span class="k"><span>${esc(x.k)}</span>${x.sample?'<span class="sample">Sample</span>':''}</span><span class="v">${esc(x.v)}</span><span class="d ${x.dn?'dn':''}">${esc(x.d)}</span>${spark(x.s)}${x.ins?`<span class="ins">${esc(x.ins)}</span>`:''}</button>`).join('');
@@ -429,7 +431,7 @@ function buildFeed(){
   h.sites.forEach(s=>q.push({name:'Sites',text:`${s.name} answered ${s.status??'?'} in ${s.ms??'?'} ms`,crit:s.status>=500}));
   const E=S.sample.emails;q.push({name:'Gmail',text:`${E.length} new · ${E.filter(e=>e.triage==='need').length} need you (sample)`,crit:true});
   q.push({name:'Calendar',text:`${S.sample.events.filter(e=>e.end>new Date()).length} events left today (sample)`});
-  q.push({name:'Analytics',text:`${S.sample.analytics.sessions.slice(-1)[0]} visitors yesterday (sample)`});
+  q.push({name:'GoatCounter',text:`${S.sample.analytics.sessions.slice(-1)[0]} visitors yesterday (sample)`});
   q.push({name:'LinkedIn',text:`${S.sample.social.followers} followers (sample)`});
   for(let i=q.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[q[i],q[j]]=[q[j],q[i]];}
   feedQ=q;
@@ -486,15 +488,17 @@ function renderIdeas(){
 /* ---------- plugged in: what I can see, and exactly what you do to give me more ---------- */
 const CF_SECRETS='https://dash.cloudflare.com/50b17fc7d1884367a1b2df1c400f8cf2/workers/services/view/traceytech-cockpit/production/settings';
 const CONNECT=[
-  {name:'Google',covers:['Gmail','Calendar','Analytics'],unlocks:'Your real inbox triaged with drafted replies, your calendar with prep notes, and visitors and search for every site.',time:'10 min',
+  {name:'Google',covers:['Gmail','Calendar'],unlocks:'Your real inbox triaged with drafted replies, your calendar with prep notes, and search clicks for every site.',time:'10 min',
     steps:[['Create a Google Cloud project called TraceyTech','https://console.cloud.google.com/projectcreate'],
-      ['Turn on the Gmail API, Google Calendar API and Google Analytics Data API','https://console.cloud.google.com/apis/library'],
+      ['Turn on the Gmail API, Google Calendar API and Search Console API','https://console.cloud.google.com/apis/library'],
       ['Set up the consent screen as External and add your own email as a test user','https://console.cloud.google.com/apis/credentials/consent'],
       ['Create an OAuth client ID, type Web application, with https://traceytech.app/connect/google/callback as the redirect address','https://console.cloud.google.com/apis/credentials'],
       ['Add the client ID and secret to TraceyTech as secrets named GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET',CF_SECRETS],
       ['Open Plugged in, press Connect Google and approve once, then press Test every service']]},
   {name:'Claude agents',covers:[],novel:true,unlocks:'Your Gmail and Google Calendar are already connected to Claude. Until Google is set up here, a scheduled Claude agent can read them every hour and post a summary into TraceyTech. Nothing is sent, and no password is stored here.',time:'1 min',
     steps:[['Say yes in our chat and I set it up. You can switch it off at any time']]},
+  {name:'GoatCounter',covers:['GoatCounter'],unlocks:'Visitors and pageviews for each of your sites, privately, with no cookies.',time:'3 min per site',
+    steps:[['Open your site\'s GoatCounter API settings. The address is https://YOURCODE.goatcounter.com/user/api, where YOURCODE is the name you chose at sign-up','https://www.goatcounter.com/'],['Choose New token, tick Read statistics only, and copy it'],['Open Connections, GoatCounter, paste the site code and the token, and press Add site']]},
   {name:'LinkedIn',covers:['LinkedIn'],partial:true,unlocks:'Followers, post reach and which topics land.',time:'15 min',
     limit:'LinkedIn does not let apps read a personal profile\'s analytics, so here I can only partly help.',
     steps:[['Best route: create a LinkedIn Page for Thinking About Policing or TraceyTech. Page analytics can be read by an approved app','https://www.linkedin.com/company/setup/new/'],
@@ -534,10 +538,10 @@ function renderGoogle(){
   if(!g){host.innerHTML='';return;}
   if(g.error){host.innerHTML=`<div class="gh"><b>Google</b><em>Could not check: ${esc(g.error)}</em></div>`;return;}
   if(!g.configured){host.innerHTML=`<div class="gh"><b>Google</b><em>The client ID and secret are not saved yet</em></div>`;return;}
-  const res=g.test&&g.test.results||[];
+  const res=(g.test&&g.test.results||[]).filter(r=>r.name!=='Analytics');
   const rows=res.map(r=>`<li class="${r.ok?'ok':'bad'}"><i></i><b>${esc(r.name)}</b><span>${esc(r.ok?(r.detail||'Working'):(r.error||'Failed'))}</span></li>`).join('');
   host.innerHTML=`<div class="gh"><b>Google</b><em>${g.connected?'Connected as '+esc(g.email||'your account'):'Not connected yet'}</em></div>`+
-   `<p class="gp">${g.connected?'Read-only access: Gmail, Calendar, Analytics, Search Console and Drive file names. I never send or change anything, and message contents are not stored.':'One approval on Google\'s own page. Read-only. You can disconnect here at any time.'}</p>`+
+   `<p class="gp">${g.connected?'Read-only access: Gmail, Calendar, Search Console and Drive file names. I never send or change anything, and message contents are not stored.':'One approval on Google\'s own page. Read-only. You can disconnect here at any time.'}</p>`+
    `<div class="gb">${g.connected?`<button type="button" class="pill" id="g-test"${GOOG.busy?' disabled':''}>${GOOG.busy?'Testing…':'Test every service'}</button><a class="pill" href="/connect/google">Reconnect</a><button type="button" class="pill" id="g-off">Disconnect</button>`:'<a class="pill gear" href="/connect/google">Connect Google</a>'}</div>`+
    (rows?`<ul class="gres">${rows}</ul><p class="gp">Last test ${esc(new Date(g.test.at).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}))}. A failed row says why; usually that API still needs switching on in Google Cloud.</p>`:'');
   const t=$('g-test');if(t)t.onclick=async()=>{GOOG.busy=true;renderGoogle();try{const r=await api('/api/google/test',{});GOOG.s.test={at:r.at,results:r.results};}catch(e){toast(`<b>Test did not run.</b> ${esc(e.message)}`);}GOOG.busy=false;renderGoogle();};
@@ -545,7 +549,7 @@ function renderGoogle(){
 }
 
 /* ---------- the map: every source, project and item, joined where they really connect ---------- */
-const SRC_OF_KIND={'Repository':'GitHub','DNS zone':'Cloudflare','Worker':'Cloudflare','Pages project':'Cloudflare','Database':'Supabase','Search Console':'Analytics'};
+const SRC_OF_KIND={'Repository':'GitHub','DNS zone':'Cloudflare','Worker':'Cloudflare','Pages project':'Cloudflare','Database':'Supabase','Search Console':'GoatCounter'};
 const EV_GROUP=[[/sebp/i,'sebp'],[/mortgage/i,'mortgage'],[/tap\b|policing/i,'tap'],[/accountant|inbox/i,'traceytech']];
 function groupKey(name){const g=S.data.groups||{};const n=String(name||'').toLowerCase();return Object.keys(g).find(k=>{const v=g[k].toLowerCase();return k===n||v===n||v.startsWith(n)||n.startsWith(v);})||null;}
 function graphData(){
@@ -789,21 +793,29 @@ const FIX={
  'Your sites':[['Cloudflare DNS','https://dash.cloudflare.com/'],['Search Console','https://search.google.com/search-console']]};
 function connItems(){
   const N=nodeStates(),h=health(),g=GOOG.s,items=[];
-  const gOk=g&&g.connected,gBad=gOk&&g.test&&(g.test.results||[]).filter(r=>!r.ok);
+  const gOk=g&&g.connected,gBad=gOk&&g.test&&(g.test.results||[]).filter(r=>!r.ok&&r.name!=='Analytics');
   items.push({name:'Google',state:!g||g.error?'off':!gOk?'off':(gBad&&gBad.length)||g.refused?'dropped':'ok',
     why:!gOk?'Not connected yet':gBad&&gBad.length?`${gBad.map(r=>r.name).join(', ')} not answering`:g.refused?'Google refused the saved login':'Gmail, Calendar, Search Console, Drive',fix:FIX.Google});
   ['GitHub','Cloudflare','Supabase'].forEach(n=>{const s=N.find(x=>x.name===n)?.state||'off';items.push({name:n,state:s==='ok'?'ok':s==='crit'?'dropped':'off',why:s==='ok'?'Answering':s==='crit'?'Stopped answering':'Not connected',fix:FIX[n]});});
   items.push({name:'Your sites',state:h.bad.length?'dropped':'ok',why:h.bad.length?`${h.bad.length} of ${h.sites.length} not answering`:`${h.sites.length} sites answering`,fix:FIX['Your sites']});
-  CONNECT.slice(1).forEach(c=>{const st=connState(c);items.push({name:c.name,state:st==='ok'?'ok':'off',why:c.steps.length?`Not connected. ${c.time||''}`.trim():'No route in',fix:(c.steps||[]).filter(s=>s[1]).slice(0,2).map(s=>[s[0].slice(0,34)+(s[0].length>34?'…':''),s[1]])});});
+  {const S2=GOAT.sites||[],bad=S2.filter(x=>!x.ok);items.push({name:'GoatCounter',state:!S2.length?'off':bad.length?'dropped':'ok',
+    why:!S2.length?'No sites added yet':bad.length?`${bad.map(x=>x.code).join(', ')} not answering`:`${S2.length} site${S2.length>1?'s':''}, ${S2.reduce((n,x)=>n+(x.week||0),0)} visitors this week`,
+    fix:bad.length?bad.map(x=>['Open '+x.code+' API settings',`https://${x.code}.goatcounter.com/user/api`]):[['How to get a token','https://www.goatcounter.com/']]});}
+  CONNECT.slice(1).filter(c=>c.name!=='GoatCounter').forEach(c=>{const st=connState(c);items.push({name:c.name,state:st==='ok'?'ok':'off',why:c.steps.length?`Not connected. ${c.time||''}`.trim():'No route in',fix:(c.steps||[]).filter(s=>s[1]).slice(0,2).map(s=>[s[0].slice(0,34)+(s[0].length>34?'…':''),s[1]])});});
   return items.map(i=>{const r=CS.rows[i.name];const own=r&&r.status;return {...i,own,note:r&&r.note||'',eff:own==='paused'||own==='archived'||own==='deleted'?own:i.state};});
 }
 const CST={ok:'Working',dropped:'Dropped out',off:'Not connected',paused:'Paused',archived:'Archived',deleted:'Deleted'};
+function goatBlock(){const S2=GOAT.sites||[];
+  return `<div class="gcs">${S2.map(x=>`<div class="gcr ${x.ok?'':'bad'}"><b>${esc(x.code)}</b><span>${esc(x.ok?`${x.today} today · ${x.week} this week`:x.error||'Not answering')}</span><button type="button" data-ca="goat-rm" data-n="${esc(x.code)}">Remove</button></div>`).join('')}
+  <div class="cam"><input type="text" id="gc-code" maxlength="60" placeholder="Site code, e.g. mysite" autocapitalize="off" autocorrect="off"><input type="password" id="gc-tok" maxlength="200" placeholder="Read token" autocomplete="off"><button type="button" data-ca="goat-add">Add site</button></div>
+  <p class="gp2">Tokens are encrypted before they are saved. Read-only. Make one at CODE.goatcounter.com/user/api.</p></div>`;}
 function connPane(){
-  const it=connItems(),live=it.filter(i=>!['archived','deleted'].includes(i.own)),arch=it.filter(i=>i.own==='archived'),del=it.filter(i=>i.own==='deleted');
+  const it=connItems(),live=it.filter(i=>!['archived','deleted'].includes(i.own)).sort((a,b)=>(b.eff==='dropped')-(a.eff==='dropped')),arch=it.filter(i=>i.own==='archived'),del=it.filter(i=>i.own==='deleted');
   const row=i=>{const bad=i.eff==='dropped';const open=CS.open===i.name;
     return `<article class="cn ${i.eff}"><div class="ch"><i></i><b>${esc(i.name)}</b><em>${esc(CST[i.eff])}</em></div>
     <p>${esc(i.eff==='paused'?'Paused. I will not alert you about it':i.why)}${i.note?` <span class="cnote">${esc(i.note)}</span>`:''}</p>
     ${bad||i.eff==='off'?`<div class="cfix">${i.fix.map(f=>`<a href="${esc(f[1])}" ${f[1][0]==='/'?'':'target="_blank" rel="noopener"'}>${esc(f[0])}</a>`).join('')}</div>`:''}
+    ${i.name==='GoatCounter'&&!['archived','deleted'].includes(i.own)?goatBlock():''}
     <div class="cact">${i.own==='archived'||i.own==='deleted'?`<button type="button" data-ca="restore" data-n="${esc(i.name)}">Restore</button>`:
       `<button type="button" data-ca="test" data-n="${esc(i.name)}"${CS.busy===i.name?' disabled':''}>${CS.busy===i.name?'Testing…':'Test'}</button>
       <button type="button" data-ca="${i.own==='paused'?'resume':'pause'}" data-n="${esc(i.name)}">${i.own==='paused'?'Resume':'Pause'}</button>
@@ -827,9 +839,13 @@ LENSES.push({id:'conns',type:'system',title:'Connections',sample:false,
 LENSES.find(l=>l.id==='conns').urgentWhen=()=>connItems().some(i=>i.eff==='dropped');
 function refreshConns(){const s=$('lens-conns');if(s)s.innerHTML=connPane();const t=document.querySelector('[data-lens="conns"]');if(t){const L=LENSES.find(l=>l.id==='conns');t.querySelector('.tp').innerHTML=L.preview();const w=t.querySelector('.lwhy');if(w)w.textContent=L.why();}}
 document.addEventListener('click',async e=>{const b=e.target.closest('[data-ca]');if(!b)return;const n=b.dataset.n,a=b.dataset.ca;
+  if(a==='goat-add'){const code=$('gc-code').value.trim(),token=$('gc-tok').value.trim();if(!code||!token){toast('<b>Need both.</b> The site code and the read token.');return;}
+    b.disabled=true;b.textContent='Checking…';try{await api('/api/goat/add',{code,token});await loadGoat();toast(`<b>Added.</b> ${esc(code)} is answering.`);}catch(er){toast(`<b>Not added.</b> ${esc(er.message)}`);}
+    renderLenses();refreshConns();return;}
+  if(a==='goat-rm'){try{await api('/api/goat/remove',{code:n});await loadGoat();}catch(er){toast(`<b>Not removed.</b> ${esc(er.message)}`);}renderLenses();refreshConns();return;}
   if(a==='test'){CS.busy=n;refreshConns();
     if(n==='Google'){try{const r=await api('/api/google/test',{});GOOG.s.test={at:r.at,results:r.results};GOOG.s.refused=false;}catch(er){GOOG.s.refused=true;toast(`<b>Google test failed.</b> ${esc(er.message)}`);}renderGoogle();}
-    else{try{await load();}catch(er){}}
+    else{try{await loadGoat();await load();}catch(er){}}
     CS.busy=null;renderLenses();refreshConns();const it=connItems().find(i=>i.name===n);if(it)toast(`<b>${esc(n)}:</b> ${esc(CST[it.eff].toLowerCase())}${it.eff==='dropped'?'. The fix links are on the card.':'.'}`);return;}
   if(a==='amend'){CS.open=CS.open===n?null:n;refreshConns();const i=$('cn-in');if(i)i.focus();return;}
   if(a==='save'){await saveConn(n,CS.rows[n]?.status,$('cn-in').value.trim());CS.open=null;refreshConns();return;}
@@ -899,7 +915,7 @@ async function load(){
   if(!sceneOn){sceneOn=true;initEnv();env.live=true;if(reduce||!$('env'))setInterval(()=>{const m=env.pick();if(m)env.onPulse(m);},4000);}
   env.setGraph(S.graph);if(document.body.classList.contains('map'))buildLabels();
   composeVoice();renderChain();renderDeck();renderIdeas();renderInbox();renderAhead();renderToday();renderPulse();renderSources();renderGoogle();renderLearned();
-  renderPreviews();loadGoogle();if(!CS.loaded)loadConns().then(()=>{renderLenses();refreshConns();});
+  renderPreviews();loadGoogle();loadGoat().then(()=>{renderLenses();refreshConns();});if(!CS.loaded)loadConns().then(()=>{renderLenses();refreshConns();});
   if(/[?&]google=connected/.test(location.search)){history.replaceState(null,'','/');toast('<b>Google connected.</b> Open Plugged in and press Test every service.');}
 }
 const clock=()=>{$('clock').textContent=hhmm(Date.now());tickNow(false);};clock();setInterval(clock,20000);
