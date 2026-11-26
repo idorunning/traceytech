@@ -523,3 +523,15 @@ body.nomap #env{opacity:0}
 @media (min-width:760px){.rc{min-height:84px;padding:8px}.rc b{font-size:13px}}
 .real{display:inline-block;font-family:var(--f-data);font-size:10px;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:99px;color:#7ee2b8;box-shadow:inset 0 0 0 1px rgba(126,226,184,.4);vertical-align:middle;margin-left:6px}
 .roster+.fix a{color:var(--mist)}
+
+.goog{padding:16px;margin-bottom:12px;border-radius:18px;grid-column:1/-1}
+.goog .gh{display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap}
+.goog .gh em{font-style:normal;opacity:.7;font-size:13px}
+.goog .gp{font-size:13px;opacity:.7;margin:8px 0 0;line-height:1.45}
+.goog .gb{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.goog .gb .pill{text-decoration:none;display:inline-flex;align-items:center;min-height:44px}
+.goog .gres{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:8px}
+.goog .gres li{display:grid;grid-template-columns:10px 110px 1fr;gap:10px;align-items:start;font-size:13px}
+.goog .gres li i{width:8px;height:8px;border-radius:50%;margin-top:5px;background:#7fd6a0}
+.goog .gres li.bad i{background:#ff7a7a}
+.goog .gres li span{opacity:.8;overflow-wrap:anywhere}

@@ -492,7 +492,7 @@ const CONNECT=[
       ['Set up the consent screen as External and add your own email as a test user','https://console.cloud.google.com/apis/credentials/consent'],
       ['Create an OAuth client ID, type Web application, with https://traceytech.app/connect/google/callback as the redirect address','https://console.cloud.google.com/apis/credentials'],
       ['Add the client ID and secret to TraceyTech as secrets named GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET',CF_SECRETS],
-      ['Tell me it is done. I add a Connect Google button here and you approve access once']]},
+      ['Open Plugged in, press Connect Google and approve once, then press Test every service']]},
   {name:'Claude agents',covers:[],novel:true,unlocks:'Your Gmail and Google Calendar are already connected to Claude. Until Google is set up here, a scheduled Claude agent can read them every hour and post a summary into TraceyTech. Nothing is sent, and no password is stored here.',time:'1 min',
     steps:[['Say yes in our chat and I set it up. You can switch it off at any time']]},
   {name:'LinkedIn',covers:['LinkedIn'],partial:true,unlocks:'Followers, post reach and which topics land.',time:'15 min',
@@ -517,10 +517,30 @@ function renderSources(){
   const live=['GitHub','Cloudflare','Supabase'].map(n=>({name:n,state:N.find(x=>x.name===n)?.state||'off'}));
   live.push({name:'Your sites',state:h.bad.length?'crit':'ok',note:`${h.sites.length} checked`});
   $('src-meta').textContent=`${live.filter(n=>n.state==='ok').length} live · ${CONNECT.filter(c=>connState(c)!=='ok').length} to plug in`;
-  $('srcs').innerHTML=`<div class="live-row">${live.map(n=>`<button type="button" class="src glass" data-n="${esc(n.name)}"><i class="${n.state==='ok'?'':n.state}"></i>${esc(n.name)}<em>${esc(n.note||CONN_TXT[n.state]||'')}</em></button>`).join('')}</div>`+
+  $('srcs').innerHTML=`<div class="goog glass" id="goog"></div><div class="live-row">${live.map(n=>`<button type="button" class="src glass" data-n="${esc(n.name)}"><i class="${n.state==='ok'?'':n.state}"></i>${esc(n.name)}<em>${esc(n.note||CONN_TXT[n.state]||'')}</em></button>`).join('')}</div>`+
     `<div class="plug">${CONNECT.map((c,i)=>{const st=connState(c);return `<button type="button" class="conn glass ${c.novel?'novel':''}" data-i="${i}"><span class="top"><i class="${st==='ok'?'':st}"></i><b>${esc(c.name)}</b><em>${esc(c.novel?'New idea':CONN_TXT[st])}</em></span><span class="u">${esc(c.unlocks)}</span><span class="f">${c.steps.length?`<span>You: ${esc(c.time)}</span><span class="go">${c.novel?'How it works':'How to connect'}</span>`:'<span>No route in. Last resort only</span><span class="go">Why</span>'}</span></button>`;}).join('')}</div>`;
   $('srcs').querySelectorAll('.src').forEach(b=>{glassLight(b);b.addEventListener('mouseenter',()=>{env.look=b.dataset.n==='Your sites'?'Sites':b.dataset.n;});b.addEventListener('click',()=>openFocus({kind:'health',key:'health',node:b.dataset.n==='Your sites'?'Sites':b.dataset.n},b));});
   $('srcs').querySelectorAll('.conn').forEach(b=>{glassLight(b);const c=CONNECT[+b.dataset.i];b.addEventListener('click',()=>openFocus({kind:'conn',c,key:'conn:'+c.name,node:c.covers[0]||'Supabase',sample:true},b));});
+}
+
+
+/* ---------- Google: connect once, then test each service. Summaries only, nothing is sent ---------- */
+const GOOG={s:null,busy:false};
+async function loadGoogle(){try{GOOG.s=await api('/api/google/status');}catch(e){GOOG.s={error:e.message};}
+  const c=CONNECT[0];if(GOOG.s&&GOOG.s.connected)c.live='ok';else delete c.live;renderGoogle();}
+function renderGoogle(){
+  const host=$('goog');if(!host)return;const g=GOOG.s;
+  if(!g){host.innerHTML='';return;}
+  if(g.error){host.innerHTML=`<div class="gh"><b>Google</b><em>Could not check: ${esc(g.error)}</em></div>`;return;}
+  if(!g.configured){host.innerHTML=`<div class="gh"><b>Google</b><em>The client ID and secret are not saved yet</em></div>`;return;}
+  const res=g.test&&g.test.results||[];
+  const rows=res.map(r=>`<li class="${r.ok?'ok':'bad'}"><i></i><b>${esc(r.name)}</b><span>${esc(r.ok?(r.detail||'Working'):(r.error||'Failed'))}</span></li>`).join('');
+  host.innerHTML=`<div class="gh"><b>Google</b><em>${g.connected?'Connected as '+esc(g.email||'your account'):'Not connected yet'}</em></div>`+
+   `<p class="gp">${g.connected?'Read-only access: Gmail, Calendar, Analytics, Search Console and Drive file names. I never send or change anything, and message contents are not stored.':'One approval on Google\'s own page. Read-only. You can disconnect here at any time.'}</p>`+
+   `<div class="gb">${g.connected?`<button type="button" class="pill" id="g-test"${GOOG.busy?' disabled':''}>${GOOG.busy?'Testing…':'Test every service'}</button><a class="pill" href="/connect/google">Reconnect</a><button type="button" class="pill" id="g-off">Disconnect</button>`:'<a class="pill gear" href="/connect/google">Connect Google</a>'}</div>`+
+   (rows?`<ul class="gres">${rows}</ul><p class="gp">Last test ${esc(new Date(g.test.at).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}))}. A failed row says why; usually that API still needs switching on in Google Cloud.</p>`:'');
+  const t=$('g-test');if(t)t.onclick=async()=>{GOOG.busy=true;renderGoogle();try{const r=await api('/api/google/test',{});GOOG.s.test={at:r.at,results:r.results};}catch(e){toast(`<b>Test did not run.</b> ${esc(e.message)}`);}GOOG.busy=false;renderGoogle();};
+  const o=$('g-off');if(o)o.onclick=async()=>{try{await api('/api/google/disconnect',{});GOOG.s=await api('/api/google/status');delete CONNECT[0].live;}catch(e){toast(`<b>Not disconnected.</b> ${esc(e.message)}`);}renderGoogle();renderSources();};
 }
 
 /* ---------- the map: every source, project and item, joined where they really connect ---------- */
@@ -814,8 +834,9 @@ async function load(){
   S.ideas=ideas();S.graph=graphData();
   if(!sceneOn){sceneOn=true;initEnv();env.live=true;if(reduce||!$('env'))setInterval(()=>{const m=env.pick();if(m)env.onPulse(m);},4000);}
   env.setGraph(S.graph);if(document.body.classList.contains('map'))buildLabels();
-  composeVoice();renderChain();renderDeck();renderIdeas();renderInbox();renderAhead();renderToday();renderPulse();renderSources();renderLearned();
-  renderPreviews();
+  composeVoice();renderChain();renderDeck();renderIdeas();renderInbox();renderAhead();renderToday();renderPulse();renderSources();renderGoogle();renderLearned();
+  renderPreviews();loadGoogle();
+  if(/[?&]google=connected/.test(location.search)){history.replaceState(null,'','/');toast('<b>Google connected.</b> Open Plugged in and press Test every service.');}
 }
 const clock=()=>{$('clock').textContent=hhmm(Date.now());tickNow(false);};clock();setInterval(clock,20000);
 (async()=>{
