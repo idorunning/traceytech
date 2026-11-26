@@ -1,0 +1,20 @@
+{
+  "name": "traceytech",
+  "private": true,
+  "type": "module",
+  "description": "TraceyTech cockpit at traceytech.app: the app page and its 3D glass layer.",
+  "scripts": {
+    "build": "vite build --config glass/vite.config.js && node scripts/build.mjs",
+    "deploy": "node scripts/deploy.mjs"
+  },
+  "dependencies": {
+    "@react-three/drei": "9.114.0",
+    "@react-three/fiber": "8.17.10",
+    "react": "18.3.1",
+    "three": "0.169.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "4.3.3",
+    "vite": "5.4.10"
+  }
+}

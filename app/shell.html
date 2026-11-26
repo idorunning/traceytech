@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#09090a">
+<meta name="robots" content="noindex,nofollow">
+<title>TraceyTech</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500&family=Geist+Mono:wght@400;500&display=swap">
+<style nonce="NONCE_PLACEHOLDER">@@CSS@@</style>
+</head>
+<body>
+<canvas id="env" aria-hidden="true"></canvas>
+<div class="vignette" aria-hidden="true"></div>
+<svg width="0" height="0" aria-hidden="true" focusable="false"><defs><linearGradient id="fadeG" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#efede8" stop-opacity=".18"/><stop offset="1" stop-color="#efede8" stop-opacity="0"/></linearGradient></defs></svg>
+
+<header class="bar" id="bar">
+  <div class="mark">
+    <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="1.5" y="1.5" width="17" height="17" rx="5.5" fill="none" stroke="currentColor" stroke-opacity=".7"/><rect x="6" y="6" width="8" height="8" rx="2.5" fill="currentColor" fill-opacity=".85"/></svg>
+    TraceyTech
+  </div>
+  <div class="bar-r">
+    <span class="clock" id="clock"></span>
+    <button type="button" class="pill gear" id="set-btn" data-pane="settings-sec" aria-label="Settings"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.6" d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4Z"/><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" d="M19.4 13.5a7.6 7.6 0 0 0 0-3l2-1.5-2-3.5-2.4 1a7.5 7.5 0 0 0-2.6-1.5L14 2.5h-4l-.4 2.5A7.5 7.5 0 0 0 7 6.5l-2.4-1-2 3.5 2 1.5a7.6 7.6 0 0 0 0 3l-2 1.5 2 3.5 2.4-1a7.5 7.5 0 0 0 2.6 1.5l.4 2.5h4l.4-2.5a7.5 7.5 0 0 0 2.6-1.5l2.4 1 2-3.5-2-1.5Z"/></svg></button>
+    <button type="button" class="pill" id="menu-btn" aria-expanded="false" aria-controls="menu">Menu</button>
+  </div>
+</header>
+<nav class="menu glass" id="menu" hidden>
+  <button type="button" id="assess">Assess now</button>
+  <button type="button" id="map-menu">Map</button>
+  <button type="button" data-pane="sources-sec">Plugged in</button>
+  <button type="button" data-pane="settings-sec">Settings</button>
+  <a href="/classic">Classic view</a>
+  <button type="button" id="signout">Sign out</button>
+</nav>
+
+<div class="shell" id="shell">
+  <main class="board" id="board" aria-label="TraceyTech">
+    <div class="tile edge t-brief span2" id="brief">
+      <div class="who"><span class="ldot" id="ldot"></span><span id="live-text">Waking up</span></div>
+      <h1 class="speak" id="voice" aria-live="polite"></h1>
+      <div class="chain" id="chain" aria-label="What I'd do, in order"></div>
+    </div>
+    <button type="button" class="tile edge t-needs rows2" data-pane="focus-sec"><span class="tk">Needs you</span><span class="tp" id="tp-needs"></span></button>
+    <button type="button" class="tile edge t-today" data-pane="today-sec"><span class="tk">Today</span><span class="tp" id="tp-today"></span></button>
+    <button type="button" class="tile edge t-inbox" data-pane="inbox-sec"><span class="tk">Inbox <span class="sample">Sample</span></span><span class="tp" id="tp-inbox"></span></button>
+    <button type="button" class="tile edge t-map span2" id="map-open"><span class="tk">Your map</span><span class="tp" id="tp-map"></span></button>
+    <button type="button" class="tile edge t-ideas" data-pane="ideas-sec"><span class="tk">Ideas</span><span class="tp" id="tp-ideas"></span></button>
+    <button type="button" class="tile edge t-ahead" data-pane="ahead-sec"><span class="tk">Two steps ahead</span><span class="tp" id="tp-ahead"></span></button>
+    <button type="button" class="tile edge t-pulse span2" data-pane="pulse-sec"><span class="tk">Pulse</span><span class="tp" id="tp-pulse"></span></button>
+    <button type="button" class="tile edge t-plug" data-pane="sources-sec"><span class="tk">Plugged in</span><span class="tp" id="tp-plug"></span></button>
+    <button type="button" class="tile edge t-learn" data-pane="learn-sec"><span class="tk">Learned</span><span class="tp" id="tp-learn"></span></button>
+  </main>
+  <p class="foot-note">Items marked Sample are placeholders until Google, LinkedIn and finance are plugged in. Nothing in them is sent or logged. <a href="/classic">Classic view</a></p>
+
+  <div id="panes" hidden>
+    <section class="sec" id="brief-sec"><p class="sub" id="sub" hidden></p></section>
+    <section class="sec" id="focus-sec" data-look="Supabase">
+      <header><h2>Needs you</h2><div class="meta" id="focus-meta"></div></header>
+      <div class="deck" id="deck" aria-label="Swipe through what needs you"></div>
+      <div class="dots" id="dots" aria-hidden="true"></div>
+    </section>
+    <section class="sec" id="ideas-sec" data-look="Analytics">
+      <header><h2>Ideas</h2><div class="meta"><span id="ideas-meta"></span></div></header>
+      <p class="lede">What I'd do if I were running your week. Each one says what it's worth and how long it takes you.</p>
+      <div class="ideas" id="ideas"></div>
+    </section>
+    <section class="sec" id="inbox-sec" data-look="Gmail">
+      <header><h2>Inbox</h2><div class="meta"><span id="inbox-meta"></span><span class="sample">Sample</span></div></header>
+      <div class="list glass" id="inbox"></div>
+    </section>
+    <section class="sec" id="ahead-sec" data-look="Calendar">
+      <header><h2>Two steps ahead</h2><div class="meta">What's coming</div></header>
+      <div class="ahead" id="ahead"></div>
+    </section>
+    <section class="sec" id="today-sec" data-look="Calendar">
+      <header><h2 id="today-h">Today</h2><div class="meta"><span id="today-meta"></span><span class="sample">Sample</span></div></header>
+      <p class="lede" id="today-plan"></p>
+      <div class="ribbon" id="ribbon"><div class="track glass" id="track"></div></div>
+    </section>
+    <section class="sec" id="pulse-sec" data-look="Analytics">
+      <header><h2>Pulse</h2><div class="meta">Last 7 days</div></header>
+      <div class="tiles" id="tiles"></div>
+    </section>
+    <section class="sec" id="sources-sec" data-look="Cloudflare">
+      <header><h2>Plugged in</h2><div class="meta" id="src-meta"></div></header>
+      <p class="lede">Everything should end up here, so you never have to visit each site. This is what I can see now, and exactly what you do to give me the rest.</p>
+      <div class="srcgrid" id="srcs"></div>
+    </section>
+    <section class="sec" id="learn-sec" data-look="Supabase">
+      <header><h2>What I've learned</h2><div class="meta">Only you can read this</div></header>
+      <div id="learned"></div>
+    </section>
+    <section class="sec" id="settings-sec">
+      <header><h2>Settings</h2><div class="meta">This device</div></header>
+      <h3 class="set-h">Edge light</h3>
+      <div class="swatches" id="swatches"></div>
+      <label class="set-row"><span>Your own colour</span><input type="color" id="edge-custom" aria-label="Pick your own edge colour"></label>
+      <label class="set-row"><span>Brightness</span><input type="range" id="edge-k" min="20" max="100" aria-label="Edge light brightness"></label>
+      <h3 class="set-h">Background map</h3>
+      <label class="set-row"><span>Show the map behind the tiles</span><input type="checkbox" id="bg-map" aria-label="Show the map behind the tiles"></label>
+    </section>
+  </div>
+</div>
+
+<div class="pane-view" id="pv" aria-hidden="true">
+  <div class="pv-scrim" id="pv-scrim"></div>
+  <div class="pv-panel tile edge" id="pv-panel" role="dialog" aria-modal="true" aria-label="Section">
+    <div class="pv-top"><button type="button" class="pill" id="pv-close">Back</button></div>
+    <div class="pv-body" id="pv-body"></div>
+  </div>
+</div>
+
+<div class="mapui" id="mapui" hidden>
+  <div class="map-top glass"><div><b>Your map</b><small id="map-meta"></small></div><button type="button" class="pill" id="map-close">Close</button></div>
+  <div class="map-labels" id="map-labels"></div>
+  <div class="map-legend"><span><i></i>Live</span><span><i class="smp"></i>Sample</span><span><i class="crit"></i>Needs you</span><span>Drag to turn · tap to open</span></div>
+</div>
+
+<div class="dock">
+  <form class="glass" id="cmd" autocomplete="off">
+    <div class="reply glass" id="reply" role="status"></div>
+    <input id="cmd-input" aria-label="Ask TraceyTech or tell it what to focus on" placeholder="Ask me anything, or tell me what to focus on">
+    <button class="go" type="submit" aria-label="Send"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h9M8.5 4.5 12 8l-3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+  </form>
+</div>
+
+<div class="why-sheet glass" id="why" role="dialog" aria-labelledby="why-q" aria-hidden="true">
+  <div class="who"><span class="ldot"></span>TraceyTech is learning</div>
+  <p id="why-q"></p>
+  <div class="chips" id="why-chips"></div>
+  <form id="why-form" autocomplete="off"><input id="why-input" aria-label="Your reason" placeholder="Or tell me in your own words"><button class="act primary" type="submit">Teach me</button><button class="act quiet" type="button" id="why-skip">Skip</button></form>
+</div>
+
+<div class="focus" id="focus" aria-hidden="true">
+  <div class="scrim" id="scrim"></div>
+  <div class="panel glass" id="panel" role="dialog" aria-modal="true" aria-labelledby="d-title">
+    <div class="scroll" id="detail"></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" nonce="NONCE_PLACEHOLDER"></script>
+<script nonce="NONCE_PLACEHOLDER">
+(() => {
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+@@ENV@@
+@@MAIN@@
+})();
+</script>
+</body>
+</html>
