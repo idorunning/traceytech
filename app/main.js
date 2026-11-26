@@ -28,43 +28,8 @@ function springEase(stiff,damp){
 }
 const SPRING=springEase(190,26),SOFT=springEase(140,24);
 
-/* ---------- placeholder data: shown until the real feeds are connected ---------- */
-function sampleData(){
-  const at=(h,m)=>{const d=new Date();d.setHours(h,m,0,0);return d;};
-  const minsAgo=m=>new Date(Date.now()-m*60000);
-  const dayAt=(dd,h,m)=>{const d=new Date();d.setDate(d.getDate()+dd);d.setHours(h,m,0,0);return d;};
-  return {
-    emails:[
-      {id:'e1',from:'SEBP conference team',ini:'SC',subject:'Venue contract needs your signature by Friday',when:minsAgo(48),triage:'need',group:'SEBP',
-        summary:'The venue will release the date unless the signed contract is back by Friday 5pm. Two clauses changed since the draft you saw: cancellation terms and catering minimums.',
-        draft:'Hi both,\n\nThanks for sending the final contract. I\'ve read the changes to the cancellation terms and catering minimums and I\'m happy with them.\n\nI\'ll sign and return it today so the date is secured well before Friday.\n\nBest,\nNathan'},
-      {id:'e2',from:'Prospective client',ini:'PC',subject:'Onboarding three brokers in January?',when:minsAgo(95),triage:'draft',group:'AI Broker Solutions',
-        summary:'A broker firm wants to onboard three advisers in January and asks about timelines, pricing and data handling.',
-        draft:'Hi,\n\nThanks for getting in touch. January works well for onboarding three advisers.\n\nOnboarding usually takes two weeks from contract to go-live. I\'ve attached our pricing and data handling summary. Would a 30 minute call on Tuesday or Wednesday next week suit you to go through it?\n\nBest regards,\nNathan'},
-      {id:'e3',from:'Domain registrar',ini:'DR',subject:'mortgage-oasis.com renews in 14 days, auto-renew is off',when:minsAgo(190),triage:'need',group:'Mortgage Oasis',
-        summary:'Auto-renew is switched off for this domain. If nothing changes it lapses on 10 December and the site goes offline.',fix:'Turn on auto-renew'},
-      {id:'e4',from:'Accountant',ini:'AC',subject:'Quarter-end: receipts for AI subscriptions',when:minsAgo(330),triage:'draft',group:'TraceyTech',
-        summary:'Asks for receipts for OpenAI, Anthropic and ElevenLabs subscriptions, split by company.',
-        draft:'Hi,\n\nI\'ll pull the receipts together this week, split by AI Broker Solutions Ltd and TraceyTech, and share a folder by Monday.\n\nThanks,\nNathan'},
-      {id:'e5',from:'GitHub',ini:'GH',subject:'Dependabot: 2 security updates ready for sebp-site',when:minsAgo(610),triage:'wait',group:'SEBP',summary:'Two moderate dependency updates are ready to merge. No breaking changes reported.'},
-      {id:'e6',from:'Research digest',ini:'RD',subject:'This week in evidence-based policing',when:minsAgo(900),triage:'wait',group:'Thinking About Policing',summary:'Five new papers. Two are relevant to your next TAP article on hot-spot patrols.'}
-    ],
-    events:[
-      {id:'c1',start:at(8,30),end:at(9,0),title:'Inbox and priorities',where:'TraceyTech'},
-      {id:'c2',start:at(10,0),end:at(10,45),title:'SEBP committee call',where:'Video call',note:'Venue contract is on the agenda. Sign it before the call and this becomes a two minute update.',move:'Sign the contract first. The draft confirmation email is ready.'},
-      {id:'c3',start:at(12,30),end:at(13,15),title:'Lunch',where:''},
-      {id:'c4',start:at(14,0),end:at(15,0),title:'Mortgage Oasis content review',where:'Studio',note:'Search clicks are 22 from 2,388 impressions. Bring the three pages with the most impressions.',move:'I\'ll list the three pages and suggested new titles an hour before.'},
-      {id:'c5',start:at(16,30),end:at(17,0),title:'Call with accountant',where:'Phone',note:'They will ask for AI subscription receipts. A reply is drafted in your inbox.',move:'Send the drafted reply before the call so it is already handled.'},
-      {id:'c6',start:at(19,0),end:at(20,0),title:'Write TAP article',where:'Home'}
-    ],
-    analytics:{sessions:[48,52,61,57,66,59,69],prev:369,sites:[['thinkingaboutpolicing.org',214,'+18%'],['mortgage-oasis.com',121,'+6%'],['id-ebp.org',47,'-4%'],['sebp-conference.app',30,'+41%']]},
-    social:{name:'LinkedIn',followers:1284,series:[1242,1249,1255,1262,1266,1279,1284],posts:2,top:'Your hot-spot policing post reached 3,120 people.'},
-    ahead:[
-      {at:dayAt(1,17,0),title:'SEBP venue contract deadline',detail:'The date is released at 5pm if it is not signed.',move:'Sign it in your next free slot today, before anyone has to chase you.',crit:true,sample:true,ref:'e1'},
-      {at:dayAt(14,0,0),title:'mortgage-oasis.com lapses',detail:'Auto-renew is off, so the site goes offline on this date.',move:'Turn on auto-renew now. It takes a minute and removes the risk.',crit:true,sample:true,ref:'e3'}
-    ]
-  };
-}
+/* ---------- live data only: empty until a source is connected ---------- */
+function sampleData(){return {emails:[],events:[],ahead:[]};}
 
 /* ---------- state ---------- */
 const S={data:null,brief:null,conn:null,items:[],dismissed:new Set(),learning:null,sample:sampleData(),deckI:0,real:{mail:false,cal:false}};
@@ -118,8 +83,8 @@ function health(){
 }
 function nodeStates(){
   const h=health();const st=n=>{const s=h.src.find(x=>x.name===n);return !s?'off':s.status==='ok'?'ok':s.status==='error'?'crit':'off';};
-  return [{name:'Gmail',state:'sample'},{name:'Calendar',state:'sample'},{name:'GoatCounter',state:GOAT.sites==null||!GOAT.sites.length?'off':GOAT.sites.some(x=>!x.ok)?'crit':'ok'},{name:'GitHub',state:st('GitHub')},
-    {name:'Cloudflare',state:st('Cloudflare')},{name:'Supabase',state:st('Supabase')},{name:'LinkedIn',state:'sample'},{name:'Finance',state:'off'}];
+  return [{name:'Gmail',state:S.real.mail?'ok':'off'},{name:'Calendar',state:S.real.cal?'ok':'off'},{name:'GoatCounter',state:GOAT.sites==null||!GOAT.sites.length?'off':GOAT.sites.some(x=>!x.ok)?'crit':'ok'},{name:'GitHub',state:st('GitHub')},
+    {name:'Cloudflare',state:st('Cloudflare')},{name:'Supabase',state:st('Supabase')},{name:'LinkedIn',state:'off'},{name:'Finance',state:'off'}];
 }
 
 /* ---------- the voice ---------- */
@@ -198,7 +163,7 @@ function deckFx(){
 }
 $('deck').addEventListener('scroll',()=>requestAnimationFrame(deckFx),{passive:true});
 
-/* ---------- inbox (sample) ---------- */
+/* ---------- inbox ---------- */
 const TRI={need:['Needs you','need'],draft:['Reply drafted','drafted'],wait:['Can wait','']};
 function renderInbox(){
   const E=S.sample.emails;
@@ -209,7 +174,7 @@ function renderInbox(){
 
 /* ---------- two steps ahead ---------- */
 function allAhead(){
-  const out=[...S.sample.ahead];
+  const out=[...(S.upcoming||[]).filter(e=>e.start>new Date()).slice(0,3).map(e=>({at:e.start,title:e.title,detail:e.where||'On your calendar',ev:e}))];
   const nextEv=S.sample.events.find(e=>e.start>new Date()&&e.note);
   if(nextEv)out.unshift({at:nextEv.start,title:nextEv.title,detail:nextEv.note||nextEv.where,move:nextEv.move,sample:true,ev:nextEv});
   const wf=(S.brief?.workflows||[])[0];
@@ -258,19 +223,19 @@ function spark(a,w=200,h=46){if(a.length<2)return '';const mx=Math.max(...a),mn=
   const P=a.map((v,i)=>[i/(a.length-1)*w,h-4-(v-mn)/r*(h-10)]);const d=P.map((p,i)=>`${i?'L':'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join('');
   let len=0;for(let i=1;i<P.length;i++)len+=Math.hypot(P[i][0]-P[i-1][0],P[i][1]-P[i-1][1]);const L=P[P.length-1];
   return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true"><path class="a" d="${d}L${w},${h}L0,${h}Z"/><path class="l" data-len="${Math.ceil(len)}" d="${d}"/><circle cx="${L[0].toFixed(1)}" cy="${L[1].toFixed(1)}" r="3"/></svg>`;}
+function goatSum(){const S2=(GOAT.sites||[]).filter(x=>x.ok);if(!S2.length)return null;const n=Math.max(...S2.map(x=>(x.series||[]).length),0);const series=Array.from({length:n},(_,i)=>S2.reduce((t,x)=>t+((x.series||[])[i]||0),0));return {week:S2.reduce((t,x)=>t+x.week,0),today:S2.reduce((t,x)=>t+x.today,0),series,sites:S2};}
 function renderPulse(){
-  const A=S.sample.analytics,So=S.sample.social;const sess=A.sessions.reduce((a,b)=>a+b,0);
   const h=health();const ms=S.data.observations.filter(o=>o.metric==='response_ms').slice(0,40).reverse().map(o=>o.value);
   const avg=ms.length?Math.round(ms.slice(-6).reduce((a,b)=>a+b,0)/Math.min(6,ms.length)):null;
-  const tapNow=52,tapPrev=30;const slow=h.sites.filter(x=>x.ms!=null).sort((a,b)=>b.ms-a.ms)[0];const up=[...A.sites].sort((a,b)=>parseFloat(b[2])-parseFloat(a[2]))[0];
+  const slow=h.sites.filter(x=>x.ms!=null).sort((a,b)=>b.ms-a.ms)[0];const g=goatSum();
   const T=[
-    {k:'Visitors',v:fmt(sess),d:`${sess>=A.prev?'+':''}${Math.round((sess-A.prev)/A.prev*100)}% on last week`,s:A.sessions,sample:true,node:'GoatCounter',kind:'metric',id:'visitors',ins:`${up[0]} is up ${up[2]}. Interest is rising, so this is the week to give people a reason to book.`},
-    {k:'Search clicks · TAP',v:fmt(tapNow),d:`from ${tapPrev}, previous 4 weeks`,s:[tapPrev,tapNow],node:'GoatCounter',kind:'metric',id:'search',ins:'Click-through is stuck at 0.9%. Better titles on three pages is the quickest lift.'},
+    g?{k:'Visitors',v:fmt(g.week),d:`${fmt(g.today)} today, last 7 days`,s:g.series,node:'GoatCounter',kind:'metric',id:'visitors',ins:`${g.sites.length} site${g.sites.length>1?'s':''} reporting`}
+     :{k:'Visitors',v:'–',d:'Not connected',empty:true,go:'lens-conns',ins:'Add each site from GoatCounter. Tap to see how.'},
     {k:'Site response',v:avg!=null?avg+' ms':'–',d:`${h.sites.length} sites, live checks`,s:ms.slice(-24),node:'Sites',kind:'metric',id:'health',dn:h.bad.length>0,ins:h.bad.length?`${h.bad[0]} is failing. I'm checking it every two hours.`:slow?`Slowest is ${slow.name} at ${slow.ms} ms. Fine for now; I flag anything over a second.`:''},
-    {k:So.name+' followers',v:fmt(So.followers),d:`+${So.followers-So.series[0]} this week`,s:So.series,sample:true,node:'LinkedIn',kind:'metric',id:'social',ins:'Your hot-spot policing post reached 3,120. Pair each TAP article with a post.'}];
-  $('tiles').innerHTML=T.map((x,i)=>`<button type="button" class="mtile glass" data-i="${i}"><span class="k"><span>${esc(x.k)}</span>${x.sample?'<span class="sample">Sample</span>':''}</span><span class="v">${esc(x.v)}</span><span class="d ${x.dn?'dn':''}">${esc(x.d)}</span>${spark(x.s)}${x.ins?`<span class="ins">${esc(x.ins)}</span>`:''}</button>`).join('');
+    {k:'LinkedIn',v:'–',d:'Not connected',empty:true,go:'lens-conns',ins:'LinkedIn limits what apps can read. Tap for the options.'}];
+  $('tiles').innerHTML=T.map((x,i)=>`<button type="button" class="mtile glass ${x.empty?'empty':''}" data-i="${i}"><span class="k"><span>${esc(x.k)}</span></span><span class="v">${esc(x.v)}</span><span class="d ${x.dn?'dn':''}">${esc(x.d)}</span>${spark(x.s||[])}${x.ins?`<span class="ins">${esc(x.ins)}</span>`:''}</button>`).join('');
   $('tiles').querySelectorAll('.mtile').forEach(b=>{const p=b.querySelector('path.l');if(p)p.style.setProperty('--len',p.dataset.len);glassLight(b);
-    b.addEventListener('click',()=>{const x=T[+b.dataset.i];openFocus(x.id==='health'?{kind:'health',key:'health',node:'Cloudflare'}:{...x,key:'m:'+x.id,title:x.k},b);});});
+    b.addEventListener('click',()=>{const x=T[+b.dataset.i];if(x.go){openPane(x.go,b);return;}openFocus(x.id==='health'?{kind:'health',key:'health',node:'Cloudflare'}:{...x,key:'m:'+x.id,title:x.k},b);});});
   io.observe($('tiles'));
 }
 
@@ -306,11 +271,9 @@ function detail(it){
     <div class="d-sec"><h3>Before it starts</h3><p>${esc(v.note||'Nothing to prepare. I\'ll remind you ten minutes before.')}</p></div><div class="actions"><button class="act quiet" data-act="close">Close</button></div>`;}
   if(it.kind==='ahead'){const a=it.a;return BACK+`<div class="d-head"><h2 id="d-title">${esc(a.title)}</h2><div class="row2"><div class="kv"><span>When</span><b>${esc(a.when)}</b></div>${a.sample?'<span class="sample">Sample</span>':''}</div></div>
     <div class="d-sec"><h3>Why I'm flagging it now</h3><p>${esc(a.detail||'')}</p></div><div class="actions">${a.ref?`<button class="act primary" data-act="email" data-id="${a.ref}">Open the email</button>`:''}<button class="act quiet" data-act="close">Close</button></div>`;}
-  if(it.kind==='metric'){const A=S.sample.analytics;
-    const body=it.id==='visitors'?`<div class="tbl"><table class="sites"><tr><th>Site</th><th>Sessions</th><th>Change</th></tr>${A.sites.map(s=>`<tr><td>${esc(s[0])}</td><td class="n">${s[1]}</td><td class="n">${s[2]}</td></tr>`).join('')}</table></div>`:
-      it.id==='social'?`<p>${esc(S.sample.social.top)} ${S.sample.social.posts} posts this week.</p>`:
-      `<p>Thinking About Policing went from 30 to 52 clicks, but click-through only moved from 0.84% to 0.90%. Most of the gain came from more impressions. Rewriting the titles and descriptions on the three most-seen pages is the quickest lift. This is from the Search Console snapshot for 26 October to 22 November.</p>`;
-    return BACK+`<div class="d-head"><h2 id="d-title">${esc(it.k)}</h2><div class="row2"><div class="kv"><span>Now</span><b>${esc(it.v)}</b></div><div class="kv"><span>Trend</span><b>${esc(it.d)}</b></div>${it.sample?'<span class="sample">Sample</span>':''}</div></div><div class="d-sec">${body}</div>`;}
+  if(it.kind==='metric'){const g=goatSum();
+    const body=it.id==='visitors'&&g?`<div class="tbl"><table class="sites"><tr><th>Site</th><th>Today</th><th>7 days</th></tr>${g.sites.map(s=>`<tr><td>${esc(s.code)}</td><td class="n">${s.today}</td><td class="n">${s.week}</td></tr>`).join('')}</table></div>`:'<p>No detail yet.</p>';
+    return BACK+`<div class="d-head"><h2 id="d-title">${esc(it.k)}</h2><div class="row2"><div class="kv"><span>Now</span><b>${esc(it.v)}</b></div><div class="kv"><span>Trend</span><b>${esc(it.d)}</b></div></div></div><div class="d-sec">${body}</div>`;}
   if(it.kind==='health'){const h=health();const hist=n=>S.data.observations.filter(o=>o.subject===n&&o.metric==='response_ms').slice(0,24).reverse().map(o=>o.value);
     const N=nodeStates();const txt={ok:'live',sample:'sample data until connected',off:'not connected',crit:'failing'};
     return BACK+`<div class="d-head"><h2 id="d-title">Sources and sites</h2><p class="statusline">Last sweep ${S.conn?.updated?hhmm(S.conn.updated)+' · '+ago(S.conn.updated):'not run yet'}</p></div>
@@ -430,10 +393,9 @@ function buildFeed(){
   const h=health();const q=[];
   h.src.filter(s=>s.status==='ok').forEach(s=>{const d=s.data||{};q.push({name:s.name,text:s.name==='GitHub'?`${d.count??'?'} repos, ${d.openIssues??'?'} open issues`:s.name==='Cloudflare'?`${d.count??'?'} zones checked`:s.name==='Supabase'?`${(d.projects||[]).filter(p=>p.status==='ACTIVE_HEALTHY').length} of ${d.count??'?'} projects healthy`:'reporting'});});
   h.sites.forEach(s=>q.push({name:'Sites',text:`${s.name} answered ${s.status??'?'} in ${s.ms??'?'} ms`,crit:s.status>=500}));
-  const E=S.sample.emails;q.push({name:'Gmail',text:`${E.length} new · ${E.filter(e=>e.triage==='need').length} need you${S.real.mail?'':' (sample)'}`,crit:true});
-  q.push({name:'Calendar',text:`${S.sample.events.filter(e=>e.end>new Date()).length} events left today${S.real.cal?'':' (sample)'}`});
-  q.push({name:'GoatCounter',text:`${S.sample.analytics.sessions.slice(-1)[0]} visitors yesterday (sample)`});
-  q.push({name:'LinkedIn',text:`${S.sample.social.followers} followers (sample)`});
+  if(S.real.mail){const E=S.sample.emails;q.push({name:'Gmail',text:`${E.length} new · ${E.filter(e=>e.triage==='need').length} need you`,crit:true});}
+  if(S.real.cal)q.push({name:'Calendar',text:`${S.sample.events.filter(e=>e.end>new Date()).length} events left today`});
+  if((GOAT.sites||[]).some(x=>x.ok))q.push({name:'GoatCounter',text:`${GOAT.sites.reduce((n,x)=>n+(x.today||0),0)} visitors today`});
   for(let i=q.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[q[i],q[j]]=[q[j],q[i]];}
   feedQ=q;
 }
@@ -444,10 +406,7 @@ env.onPulse=m=>{const t=$('live-text');t.classList.add('swap');setTimeout(()=>{t
 const dur=ms=>{const m=Math.round(ms/60000);const h=Math.floor(m/60),r=m%60;return h?`${h}h${r?' '+String(r).padStart(2,'0'):''}`:m+' min';};
 function todoPool(){
   const E=id=>S.sample.emails.find(e=>e.id===id);const em=e=>({kind:'email',e,key:'e:'+e.id,node:'Gmail',sample:!S.real.mail});const out=[];
-  if(E('e1'))out.push({t:'Sign the SEBP contract',min:10,it:em(E('e1')),crit:true,sample:true});
-  if(E('e3'))out.push({t:'Turn on auto-renew',min:5,it:em(E('e3')),crit:true,sample:true});
   S.items.filter(x=>x.level==='urgent').slice(0,2).forEach(x=>out.push({t:x.kind==='cluster'?x.title:titleOf(x),min:20,it:x,crit:true}));
-  if(E('e2'))out.push({t:'Reply to the broker enquiry',min:10,it:em(E('e2')),sample:true});
   const tap=S.ideas?.find(i=>i.id==='tap-titles');if(tap)out.push({t:'Rewrite TAP page titles',min:45,it:tap});
   return out;
 }
@@ -464,18 +423,10 @@ function gapPlan(){
 /* ---------- ideas: what I'd do if I were running your week ---------- */
 function ideas(){
   const out=[];const E=id=>S.sample.emails.find(e=>e.id===id);const cl=S.items.find(x=>x.kind==='cluster');
-  if(E('e1'))out.push({id:'sebp-sign',title:'Sign the SEBP contract today, not on Friday',why:'The venue releases the date at 5pm Friday. It is also on today\'s committee call agenda, so signing first turns a discussion into a two minute update.',value:'Date secured a day early',eff:'10 min',crit:true,sample:true,
-    steps:[['Open the email and check the two changed clauses: cancellation terms and catering minimums'],['Sign and send the reply I drafted']],open:{kind:'email',e:E('e1'),key:'e:e1',node:'Gmail',sample:!S.real.mail}});
   if(cl)out.push({id:'own-once',title:`Do the ${NUM[cl.members.length]||cl.members.length} ownership checks in one sitting`,why:'Each check needs the same evidence: who owns it, who pays, and whether backups restore. Gathering it once and recording it in one register stops the same work being redone three times.',value:'One register instead of three reviews',eff:'20 min',crit:cl.level==='urgent',
     steps:cl.members.map(m=>[m.label+': '+(m.p.action||'confirm the owner and payer')]),open:cl});
-  out.push({id:'tap-titles',title:'Rewrite the titles of TAP\'s three most-seen pages',why:'Search clicks rose from 30 to 52, but click-through only moved from 0.84% to 0.90%. The gain came from being shown more, not from more people choosing you. Better titles are the quickest lift.',value:'About 115 clicks a month at 2% click-through',eff:'1 hour',
-    steps:[['Open Search Console, go to Pages and sort by impressions','https://search.google.com/search-console'],['Send me the top three page addresses and I\'ll draft new titles and descriptions'],['Paste them into each page and I\'ll measure the change for four weeks']]});
-  out.push({id:'sebp-early',title:'Announce an early-bird deadline for SEBP',why:'Visits to sebp-conference.app are up 41% this week. Interest is rising now, so a deadline turns visits into bookings while attention is high.',value:'More bookings while interest peaks',eff:'30 min',sample:true,
-    steps:[['Pick a date two to three weeks out'],['I draft the banner text and an email to last year\'s attendees'],['You approve, and I schedule the LinkedIn post']]});
-  out.push({id:'li-tap',title:'Turn your next TAP article into a LinkedIn post',why:'Your hot-spot policing post reached 3,120 people, far above your usual reach. Pairing each new article with a short post brings that audience back to the site.',value:'Steady traffic from your strongest channel',eff:'15 min',sample:true,
-    steps:[['When the article is published, I draft the post with the key finding first'],['You edit and approve it'],['I suggest the best time to post based on past reach']]});
-  if(E('e4'))out.push({id:'receipts',title:'Have AI receipts collected automatically each month',why:'Your accountant asks for these every quarter. A Gmail filter can label every receipt by company as it arrives, and this app can file them, so quarter-end is one click.',value:'An hour saved every quarter',eff:'15 min once',sample:true,
-    steps:[['Connect Google (see Plugged in below)'],['I create the filter and labels for each company'],['Each quarter I share one folder with your accountant, after you approve']],open:{kind:'email',e:E('e4'),key:'e:e4',node:'Gmail',sample:!S.real.mail}});
+  if(!(GOAT.sites||[]).length)out.push({id:'goat-add',title:'Add your sites to GoatCounter here',why:'I can only tell you what your visitors are doing once each site is connected. Until then there are no visitor numbers at all, because I will not invent them.',value:'Real visitor numbers for every site',eff:'3 min per site',
+    steps:[['Open https://YOURCODE.goatcounter.com/user/api, choose New token, tick Read statistics and copy it','https://www.goatcounter.com/'],['Open Connections, GoatCounter, paste the site code and token, and press Add site']]});
   S.items.filter(x=>x.kind==='improvement').forEach(x=>out.push({id:x.key,title:x.title||firstSentence(x.text),why:x.title?x.text:x.text.replace(firstSentence(x.text),'').trim(),value:'Less repeated checking',eff:'Half a day',steps:[],imp:x}));
   return out.filter(x=>!S.dismissed.has('idea:'+x.id)).map(x=>({...x,kind:'idea',key:'idea:'+x.id,node:x.open?.node||'Supabase',text:x.why,level:'opportunity'}));
 }
@@ -559,10 +510,10 @@ function mapMail(x){const m=/^\s*"?([^"<]*?)"?\s*<([^>]+)>\s*$/.exec(x.from||'')
 async function loadFeed(){if(!(GOOG.s&&GOOG.s.connected))return;
   try{const f=await api('/api/google/feed');GOOG.feedErr=f.errors||{};
     if(!GOOG.feedErr.gmail){S.sample.emails=(f.emails||[]).map(mapMail);S.real.mail=true;document.querySelectorAll('.t-inbox .sample,#inbox-smp').forEach(x=>x.remove());}
-    if(!GOOG.feedErr.calendar){const t0=new Date().setHours(0,0,0,0),t1=t0+864e5;S.sample.events=(f.events||[]).filter(e=>!e.allDay&&e.start&&e.end&&+new Date(e.start)>=t0&&+new Date(e.start)<t1).map(e=>({id:e.id,start:new Date(e.start),end:new Date(e.end),title:e.title,where:e.where||''}));S.real.cal=true;const ts=$('today-smp');if(ts)ts.remove();}
+    if(!GOOG.feedErr.calendar){const t0=new Date().setHours(0,0,0,0),t1=t0+864e5;S.sample.events=(f.events||[]).filter(e=>!e.allDay&&e.start&&e.end&&+new Date(e.start)>=t0&&+new Date(e.start)<t1).map(e=>({id:e.id,start:new Date(e.start),end:new Date(e.end),title:e.title,where:e.where||''}));S.upcoming=(f.events||[]).filter(e=>!e.allDay&&e.start&&e.end).map(e=>({id:e.id,start:new Date(e.start),end:new Date(e.end),title:e.title,where:e.where||''}));S.real.cal=true;const ts=$('today-smp');if(ts)ts.remove();}
   }catch(e){GOOG.feedErr={google:e.message};}
   repaint();}
-function repaint(){S.ideas=ideas();S.graph=graphData();env.setGraph(S.graph);composeVoice();renderChain();renderDeck();renderIdeas();renderInbox();renderAhead();renderToday();renderPulse();renderSources();renderGoogle();renderPreviews();refreshConns();}
+function repaint(){S.life=null;S.ideas=ideas();S.graph=graphData();env.setGraph(S.graph);composeVoice();renderChain();renderDeck();renderIdeas();renderInbox();renderAhead();renderToday();renderPulse();renderSources();renderGoogle();renderPreviews();refreshConns();}
 
 /* ---------- the map: every source, project and item, joined where they really connect ---------- */
 const SRC_OF_KIND={'Repository':'GitHub','DNS zone':'Cloudflare','Worker':'Cloudflare','Pages project':'Cloudflare','Database':'Supabase','Search Console':'GoatCounter'};
@@ -600,7 +551,7 @@ function drawLabels(){
 function tapNode(n,el){
   if(n.kind==='item'){env.hot=n.id;openFocus(n.ref,el);return;}
   env.hot=env.hot===n.id?null:n.id;if(!env.hot)return;
-  openFocus({kind:'node',n,key:'n:'+n.id,node:n.kind==='source'?n.label:null,sample:true},el);
+  openFocus({kind:'node',n,key:'n:'+n.id,node:n.kind==='source'?n.label:null,sample:false},el);
 }
 function openMap(){if(!$('env'))return;toggleMenu(false);document.body.classList.add('map');env.mapGoal=1;$('mapui').hidden=false;buildLabels();env.onFrame=drawLabels;}
 function closeMap(){document.body.classList.remove('map');env.mapGoal=0;env.hot=null;$('mapui').hidden=true;env.onFrame=null;}
@@ -657,14 +608,14 @@ function renderPreviews(){
   const now=new Date(),nx=S.sample.events.find(e=>e.end>now),G=gapPlan();
   $('tp-today').innerHTML=`${miniDay()}<span class="row1"><b>${nx?hhmm(nx.start):'–'}</b> ${esc(nx?nx.title:'Nothing else today')}</span><span class="lbl">${G.length} free slot${G.length===1?'':'s'}, planned</span>`;
   const E=S.sample.emails,need=E.filter(e=>e.triage==='need');
-  $('tp-inbox').innerHTML=`<span class="avs">${E.slice(0,5).map(e=>`<i class="${e.triage==='need'?'crit':''}">${esc(e.ini)}</i>`).join('')}</span><span class="row1"><b class="${need.length?'crit':''}">${need.length}</b> need you</span><span class="lbl">${E.filter(e=>e.draft).length} replies drafted</span>`;
+  $('tp-inbox').innerHTML=`<span class="avs">${E.slice(0,5).map(e=>`<i class="${e.triage==='need'?'crit':''}">${esc(e.ini)}</i>`).join('')}</span><span class="row1"><b class="${need.length?'crit':''}">${need.length}</b> need you</span><span class="lbl">${S.real.mail?'Unread, last 14 days':'Not connected'}</span>`;
   const k=S.graph.nodes.reduce((m,n)=>(m[n.kind]=(m[n.kind]||0)+1,m),{});
   $('tp-map').innerHTML=`${miniMap()}<span class="lbl">${k.source} sources · ${k.project} projects · ${k.asset} assets · ${k.item} live items. Tap to bring it into focus</span>`;
   const I=S.ideas||[];$('tp-ideas').innerHTML=`<span class="big">${I.length}</span><span class="row1">${esc(I[0]?.title||'')}</span><span class="lbl">${esc(I[0]?.value||'')}</span>`;
   const A=allAhead().filter(a=>a.at&&a.at>now).sort((a,b)=>(b.crit?1:0)-(a.crit?1:0)||a.at-b.at)[0];
   $('tp-ahead').innerHTML=A?`<span class="big ${A.crit?'crit':''}">${esc(countdown(A.at).replace(/^in /,''))}</span><span class="row1">${esc(A.title)}</span><span class="lbl">${esc(A.when)}</span>`:'';
-  const An=S.sample.analytics,sess=An.sessions.reduce((a,b)=>a+b,0),So=S.sample.social;const ms=S.data.observations.filter(o=>o.metric==='response_ms').slice(0,24).reverse().map(o=>o.value);
-  $('tp-pulse').innerHTML=`<span class="pcols">${[['Visitors',fmt(sess),An.sessions,true],['TAP search clicks','52',[30,52],false],['Site response',ms.length?Math.round(ms.slice(-6).reduce((a,b)=>a+b,0)/Math.min(6,ms.length))+' ms':'–',ms,false],['LinkedIn',fmt(So.followers),So.series,true]].map(c=>`<span class="pc"><small>${esc(c[0])}${c[3]?' ·  sample':''}</small><b>${esc(c[1])}</b>${spark(c[2],120,30)}</span>`).join('')}</span>`;
+  const g=goatSum(),ms=S.data.observations.filter(o=>o.metric==='response_ms').slice(0,24).reverse().map(o=>o.value);
+  $('tp-pulse').innerHTML=`<span class="pcols">${[['Visitors',g?fmt(g.week):'–',g?g.series:[]],['Site response',ms.length?Math.round(ms.slice(-6).reduce((a,b)=>a+b,0)/Math.min(6,ms.length))+' ms':'–',ms]].map(c=>`<span class="pc"><small>${esc(c[0])}${c[0]==='Visitors'&&!g?' · not connected':''}</small><b>${esc(c[1])}</b>${spark(c[2],120,30)}</span>`).join('')}</span>`;
   $('tp-pulse').querySelectorAll('path.l').forEach(p=>p.style.setProperty('--len',p.dataset.len));
   const N=nodeStates();$('tp-plug').innerHTML=`<span class="sdots">${N.map(n=>`<i class="${n.state}" title="${esc(n.name)}"></i>`).join('')}</span><span class="row1"><b>${N.filter(n=>n.state==='ok').length}</b> live</span><span class="lbl">${CONNECT.filter(c=>connState(c)!=='ok').length} to plug in, with steps</span>`;
   const L=S.learning;const nd=L?.decisions?.length||0;$('tp-learn').innerHTML=`<span class="big">${nd}</span><span class="lbl">${nd?'decisions logged, with your reasons':'Every decision you make here teaches me. I ask why.'}</span>`;
@@ -696,14 +647,10 @@ function shiftOn(d){const day=new Date(new Date(d).setHours(0,0,0,0));let code,p
   const h=code.slice(1).split('-');return {c,name:SH_NAME[c],day,proj,start:at(day,+h[0].slice(0,2),+h[0].slice(2)),end:at(day,+h[1].slice(0,2),+h[1].slice(2))};}
 const shiftTxt=s=>s.c==='R'?(s.leave?s.name:'Rest day'):`${s.name} ${hhmm(s.start)}–${hhmm(s.end)}`;
 function lifeData(){
-  const P=(y,mo,d,h,mi,hrs,title,kind,real)=>{const s=new Date(y,mo,d,h,mi);return {title,kind,sample:!real&&kind!=='work',start:s,end:new Date(+s+hrs*36e5)};};
-  const plans=[P(2027,2,11,0,0,96,'Kraków with your wife','trip',true),P(2026,10,27,13,30,1,'Call with Richard Kempshall (Davidhorn)','work'),P(2026,10,30,11,0,.5,'RSG exploratory meeting (Martin Jerrold)','work'),P(2026,11,5,19,0,4,'Dinner with friends','social'),
-    P(2026,11,12,10,0,6,'Christmas shopping','errand'),P(2026,11,19,19,30,4,'Christmas drinks with friends','social'),
-    P(2026,11,25,13,0,5,'Christmas dinner at home','family'),P(2026,11,31,20,0,5,"New Year's Eve",'social')];
-  const presents=[{who:'Your wife (Christmas)',idea:'Weekend away in January, booked as the present',by:new Date(2026,11,15),done:false},
-    {who:'Mum and Dad',idea:'Framed family photo and a meal out',by:new Date(2026,11,15),done:false},
-    {who:'Work Secret Santa',idea:'£10 limit',by:new Date(2026,11,18),done:false}];
-  return {plans,presents,birthday:new Date(2027,8,2),trip:new Date(2027,2,11),summer:new Date(2027,6,17),xmas:new Date(2026,11,25)};
+  const trip=new Date(2027,2,11);
+  const plans=[{title:'Kraków with your wife',kind:'trip',sample:false,start:trip,end:new Date(+trip+96*36e5)},
+    ...(S.upcoming||[]).filter(e=>e.end>new Date()).map(e=>({title:e.title,kind:'plan',sample:false,start:e.start,end:e.end}))];
+  return {plans,presents:[],birthday:new Date(2027,8,2),trip,summer:new Date(2027,6,17),xmas:new Date(2026,11,25)};
 }
 function clashes(){
   const L=S.life,out=[];
@@ -726,11 +673,11 @@ const days=d=>Math.ceil((new Date(d).setHours(0,0,0,0)-new Date().setHours(0,0,0
 const strip=(n=10)=>`<span class="shs">${Array.from({length:n},(_,i)=>{const s=shiftOn(Date.now()+i*DAY);return `<i class="s${s.c} ${i?'':'now'}"><b>${s.c==='R'?'':s.c}</b><small>${new Date(Date.now()+i*DAY).toLocaleDateString('en-GB',{weekday:'narrow'})}</small></i>`;}).join('')}</span>`;
 
 const LENSES=[
- {id:'clash',type:'urgent',title:'Clashes',sample:true,mixed:true,score:()=>{const c=S.clash;return c.some(x=>x.level==='clash')?96:c.length?72:0;},
+ {id:'clash',type:'urgent',title:'Clashes',sample:false,mixed:true,score:()=>{const c=S.clash;return c.some(x=>x.level==='clash')?96:c.length?72:0;},
   why:()=>{const c=S.clash.find(x=>x.level==='clash')||S.clash[0];return c?`${c.p.title} vs your ${c.s.name.toLowerCase()} shift`:'';},
   preview:()=>{const c=S.clash,n=c.filter(x=>x.level==='clash').length;const f=c[0];
     return `<span class="big ${n?'crit':''}">${c.length}</span><span class="row1">${n} clash${n===1?'':'es'}, ${c.length-n} tight</span><span class="lbl">Next: ${esc(f?shortDay(f.p.start)+' · '+f.p.title:'')}</span>`;},
-  pane:()=>`<header><h2>Clashes</h2><div class="meta">Your plans checked against your real rota <span class="sample">Personal plans are samples</span></div></header>
+  pane:()=>`<header><h2>Clashes</h2><div class="meta">Your plans checked against your real rota <span class="real">Live</span></div></header>
    <div class="clist">${S.clash.map((c,i)=>`<article class="cl ${c.level}"><div class="cl-h"><b>${esc(c.level==='clash'?'Clash':'Tight')}</b><span>${esc(dayLabel(c.p.start))}</span></div>
    <h3>${esc(c.p.title)} <small>${c.multi?esc(shortDay(c.p.start)+' to '+shortDay(new Date(+c.p.end-DAY))):hhmm(c.p.start)+'–'+hhmm(c.p.end)}</small>${c.p.sample?' <span class="sample">Sample</span>':' <span class="real">From your calendar</span>'}</h3><p>${esc(c.why)}</p><p class="fix">${esc(c.fix)}</p>
    ${c.p.kind==='work'?'':`<button type="button" class="act" data-draft="${i}">${c.multi?'Draft a leave request':'Draft a swap request'}</button>`}<div class="drafted" id="swap-${i}" hidden></div></article>`).join('')||'<p class="empty">No clashes in the next month.</p>'}</div>`},
@@ -763,12 +710,12 @@ const LENSES=[
    <article><small>2 · By ${esc(mo(d(150)))}</small><b>Choose where</b><p>Twelve days is long enough for abroad. Tell me the kind of trip you want, a budget, and who is coming, and I will give you three options.</p></article>
    <article><small>3 · By ${esc(mo(d(120)))}</small><b>Book flights and stay</b><p>July is peak season, so prices climb steadily. Booking four months out usually beats waiting.</p></article>
    <article><small>4 · By ${esc(mo(d(14)))}</small><b>Before you go</b><p>Passports and insurance, an out-of-office I draft for you, and a list of what can wait until you are back. I can hold the non-urgent emails and flag only the urgent ones.</p></article></div>`;}},
- {id:'xmas',type:'personal',title:'Christmas',sample:true,score:()=>{const d=days(S.life.xmas);if(d<0||d>50)return 0;const left=S.life.presents.filter(p=>!p.done).length;return 40+(50-d)*.6+left*4;},
-  why:()=>{const left=S.life.presents.filter(p=>!p.done).length;return `${days(S.life.xmas)} days, ${left} present${left===1?'':'s'} to sort`;},
-  preview:()=>{const P=S.life.presents,done=P.filter(p=>p.done).length,s=shiftOn(S.life.xmas);return `<span class="big">${days(S.life.xmas)}<small> days</small></span><span class="row1">${done} of ${P.length} presents sorted</span><span class="lbl">Christmas Day: ${esc(shiftTxt(s))}</span>`;},
+ {id:'xmas',type:'personal',title:'Christmas',sample:false,score:()=>{const d=days(S.life.xmas);if(d<0||d>50)return 0;return 40+(50-d)*.6;},
+  why:()=>`${days(S.life.xmas)} days. Who are you buying for?`,
+  preview:()=>{const s=shiftOn(S.life.xmas);return `<span class="big">${days(S.life.xmas)}<small> days</small></span><span class="row1">Christmas Day: ${esc(shiftTxt(s))}</span>`;},
   pane:()=>{const P=S.life.presents,r=restDays(Date.now(),new Date(2026,11,15));
-   return `<header><h2>Christmas</h2><div class="meta">${days(S.life.xmas)} days · order online by Tue 15 Dec to be safe <span class="sample">Sample</span></div></header>
-   <div class="plist">${P.map(p=>`<article><div><b>${esc(p.who)}</b><p>${esc(p.idea)}</p></div><span class="by ${days(p.by)<7?'crit':''}">by ${esc(shortDay(p.by))}</span></article>`).join('')}</div>
+   return `<header><h2>Christmas</h2><div class="meta">${days(S.life.xmas)} days · order online by Tue 15 Dec to be safe</div></header>
+   <p class="empty">I don't know who you are buying for yet. Tell me in the box below, for example "Mum, Dad and my wife", and I will track ideas and order-by dates for each.</p>
    <p class="fix">Shopping days that are already rest days: ${r.map(shortDay).map(esc).join(', ')}. I'd do it all on ${esc(r[0]?shortDay(r[0]):'your next rest day')}.</p>`;}},
  {id:'shifts',type:'work',title:'Shifts and days off',sample:false,score:()=>{const t=shiftOn(Date.now());return t.c==='R'?52:66;},
   why:()=>{const t=shiftOn(Date.now());return t.c==='R'?'Rest day today':`${t.name} today, rest from ${shortDay(nextRest(Date.now()))}`;},
@@ -779,10 +726,10 @@ const LENSES=[
    return `<header><h2>Shifts and days off</h2><div class="meta">Sussex RIT D, from Section Shifts <span class="real">Real</span></div></header>
    <div class="roster"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>${cells}</div>
    <p class="fix">Red outline: a plan clashes with a shift. Rota published to 31 January; later weeks follow the same ten-day cycle. It excludes leave, bank holidays and rest days in lieu, so check the official system before committing. <a href="${ROTA_SRC}" target="_blank" rel="noopener">Open Section Shifts</a></p>`;}},
- {id:'plans',type:'personal',title:'Plans',sample:true,score:()=>S.life.plans.filter(p=>p.start>Date.now()&&days(p.start)<=21).length?44:0,
-  why:()=>'Social and family, next three weeks',
+ {id:'plans',type:'personal',title:'Plans',sample:false,score:()=>S.life.plans.filter(p=>p.start>Date.now()&&days(p.start)<=21).length?44:0,
+  why:()=>'From your calendar, next three weeks',
   preview:()=>{const n=S.life.plans.filter(p=>p.start>Date.now());const f=n[0];const bad=new Set(S.clash.map(c=>c.p));return `<span class="big">${n.filter(p=>days(p.start)<=31).length}</span><span class="row1">${esc(f?f.title:'')}</span><span class="lbl">${esc(f?shortDay(f.start):'')}${f&&bad.has(f)?' · clashes with a shift':''}</span>`;},
-  pane:()=>{const bad=new Map(S.clash.map(c=>[c.p,c]));return `<header><h2>Plans</h2><div class="meta">Social and family <span class="sample">Sample</span></div></header>
+  pane:()=>{const bad=new Map(S.clash.map(c=>[c.p,c]));return `<header><h2>Plans</h2><div class="meta">From your Google Calendar <span class="real">Live</span></div></header>
    <div class="plist">${S.life.plans.filter(p=>p.end>Date.now()).map(p=>{const c=bad.get(p),s=shiftOn(p.start);return `<article class="${c?c.level:''}"><div><b>${esc(p.title)}</b><p>${esc(dayLabel(p.start))} · ${hhmm(p.start)}. ${esc(c?c.why:'You are '+(s.c==='R'?'on a rest day.':'free: '+shiftTxt(s)+'.'))}</p></div><span class="by ${c&&c.level==='clash'?'crit':''}">${c?c.level==='clash'?'Clash':'Tight':'Clear'}</span></article>`;}).join('')}</div>`;}},
 ];
 const CORE={
@@ -890,7 +837,7 @@ function renderLenses(){
 document.addEventListener('click',e=>{const b=e.target.closest('[data-draft]');if(!b)return;const c=S.clash[+b.dataset.draft];if(!c)return;const box=$('swap-'+b.dataset.draft);
   box.hidden=false;if(c.multi){box.textContent=`Hi Sarge, I would like to request annual leave from ${dayLabel(c.p.start)} to ${dayLabel(new Date(+c.p.end-DAY))} for a trip abroad with my wife. I am asking early so it can be planned around. Please let me know if you need anything else from me. Thanks.`;b.textContent='Drafted. Nothing is sent';b.disabled=true;return;}
   box.hidden=false;box.textContent=`Hi Sarge, could I swap my ${c.s.name.toLowerCase()} shift on ${dayLabel(c.s.day)} for one of my rest days? I have ${c.p.kind==='family'?'a family commitment':'plans I can\'t move'} (${c.p.title.toLowerCase()}). Happy to cover a shift in return. Thanks.`;
-  b.textContent='Drafted. Sample: nothing is sent';b.disabled=true;});
+  b.textContent='Drafted. Nothing is sent';b.disabled=true;});
 
 /* ---------- settings: the colour of the light in the glass ---------- */
 const EDGE=[['Ice','#bfe3ff'],['Paper','#efede8'],['Signal','#ff5a4f'],['Amber','#ffb547'],['Mint','#5ff2c2'],['Violet','#a98bff'],['Cyan','#40d9ff']];
