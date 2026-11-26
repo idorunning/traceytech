@@ -567,3 +567,12 @@ body.nomap #env{opacity:0}
 .gcs .cam{flex-wrap:wrap}.gcs .cam input{flex:1 1 120px}.gp2{margin:0;font-size:12px;color:var(--ash)}
 
 .mtile.empty{opacity:.75}.mtile.empty .v{opacity:.5}
+
+.rbox{margin-top:14px}.rbox .rin{display:flex;gap:8px}.rbox input{flex:1;min-width:0;padding:12px 16px;border-radius:999px;background:rgba(255,255,255,.05);color:var(--paper);border:0;box-shadow:inset 0 0 0 1px var(--line-2);font:inherit;font-size:14px}
+.rbox button{font-size:13px;padding:10px 16px;min-height:44px;border-radius:999px;color:var(--paper);background:none;box-shadow:inset 0 0 0 1px var(--line-2)}.rbox button:disabled{opacity:.5}
+.rbox .rans{margin:0 0 10px;font-size:13px;color:var(--mist);line-height:1.45}.rbox .rans b{color:var(--paper)}.rbox .rans em{display:block;font-style:normal;color:var(--ash)}.rbox .rans button{margin-left:8px;min-height:36px;padding:6px 12px}
+.rbox .rwhy{margin-top:10px}.rbox .rwhy p{margin:0 0 8px;font-size:13px;color:var(--mist)}
+
+.mmodes{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}.mmodes button{font-size:13px;padding:10px 16px;min-height:44px;border-radius:999px;color:var(--paper);background:none;box-shadow:inset 0 0 0 1px var(--line-2)}.mmodes button.on{background:rgba(255,255,255,.12)}
+.mroute .big{font-size:56px}.mroute p{color:var(--mist)}a.act{display:inline-flex;align-items:center;min-height:44px;padding:0 18px;border-radius:999px;color:var(--paper);text-decoration:none;box-shadow:inset 0 0 0 1px var(--line-2)}
+.steps{padding-left:20px;color:var(--mist);line-height:1.5;font-size:14px}.steps a{color:var(--paper)}

@@ -297,6 +297,7 @@ function placePanel(){const t=targetRect();Object.assign(panel.style,{left:t.lef
 const topicOf=it=>(it.kind==='priority'?'priority:'+it.p.topic:it.kind==='cluster'?'cluster:'+it.node:it.kind).slice(0,100);
 function openFocus(it,el){
   if(!it)return;current=it;current.el=el;openedAt=Date.now();detailEl.innerHTML=detail(it);
+  if(['email','event','idea','priority','cluster','ahead'].includes(it.kind)){const t=it.title||(it.e&&it.e.subject)||(it.ev&&it.ev.title)||(it.a&&it.a.title)||titleOf(it)||'Item';detailEl.insertAdjacentHTML('beforeend',rbHtml('item:'+it.key,t,'Tell me more, or correct me'));}
   focusEl.classList.add('on');focusEl.setAttribute('aria-hidden','false');document.body.classList.add('focused');
   env.target=1;env.look=it.node||null;if(S.graph&&!env.hot)env.hot=S.graph.nodes.some(n=>n.id==='i:'+it.key)?'i:'+it.key:it.node?'s:'+it.node:null;
   if(!it.sample)api('/api/attention',{topic:topicOf(it),visit:true,seconds:0}).catch(()=>{});
@@ -501,6 +502,82 @@ function renderGoogle(){
 }
 
 
+
+/* ---------- reply boxes: answer anything I raise, in your own words ---------- */
+S.answers={};
+async function loadAnswers(){try{const r=await api('/api/answers');S.answers=Object.fromEntries((r.rows||[]).map(x=>[x.key,x]));}catch(e){}}
+const clashKey=p=>'clash:'+p.title+'|'+new Date(p.start).toISOString().slice(0,10);
+function rbHtml(key,title,ph){const a=S.answers[key];
+  return `<div class="rbox" data-key="${esc(key)}" data-title="${esc(title)}">${a?`<p class="rans"><b>You told me:</b> ${esc(a.text)}${a.summary?`<em>Understood: ${esc(a.summary)}</em>`:''}<button type="button" data-rb="undo">Undo</button></p>`:''}
+  <div class="rin"><input type="text" maxlength="500" placeholder="${esc(ph||'Tell me more, or correct me')}" aria-label="Reply to TraceyTech"><button type="button" data-rb="send">Send</button></div><div class="rwhy" hidden></div></div>`;}
+function refreshClash(){S.life=lifeData();S.clash=clashes();const s=$('lens-clash');const L=LENSES.find(l=>l.id==='clash');if(s&&L)s.innerHTML=L.pane();renderLenses();}
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-rb]');if(!b)return;const box=b.closest('.rbox');if(!box)return;const key=box.dataset.key,title=box.dataset.title,a=b.dataset.rb;
+  if(a==='send'){const inp=box.querySelector('input'),text=inp.value.trim();if(!text)return;b.disabled=true;
+    try{const r=await api('/api/reply',{key,title,text});S.answers[key]={key,text,effect:r.effect,summary:r.summary};
+      const why=box.querySelector('.rwhy');
+      if(key.startsWith('clash:')){refreshClash();}else{box.outerHTML=rbHtml(key,title);}
+      const nb=document.querySelector(`.rbox[data-key="${CSS.escape(key)}"]`)||box;const w=nb.querySelector('.rwhy');
+      if(w){w.hidden=false;w.dataset.did=r.decision_id||'';w.innerHTML=`<p>Understood: <b>${esc(r.summary||'noted')}</b>${r.effect==='resolved'?'. I will stop flagging this.':r.effect==='ignore'?'. I will stop raising it.':'. Saved.'}</p>${r.decision_id?`<div class="rin"><input type="text" maxlength="400" placeholder="Why? (optional, it helps me learn)"><button type="button" data-rb="why">Save why</button></div>`:''}`;}
+    }catch(er){toast(`<b>Not saved.</b> ${esc(er.message)}`);b.disabled=false;}return;}
+  if(a==='why'){const w=box.querySelector('.rwhy'),v=w.querySelector('input').value.trim(),did=w.dataset.did;if(!v||!did)return;b.disabled=true;
+    try{await api('/api/decision',{decision_id:did,title:'reason',question:'Why?',answer:v});w.innerHTML='<p>Thanks, logged with your reason.</p>';loadLearning().then(renderLearned);}catch(er){toast(`<b>Not saved.</b> ${esc(er.message)}`);b.disabled=false;}return;}
+  if(a==='undo'){try{await api('/api/reply',{key,undo:true});delete S.answers[key];if(key.startsWith('clash:'))refreshClash();else box.outerHTML=rbHtml(key,title);}catch(er){toast(`<b>Not undone.</b> ${esc(er.message)}`);}}
+});
+
+
+/* ---------- Google Maps: directions and places near you. Location stays on this device until you ask for a route ---------- */
+const MAPS={configured:null,pos:null,posErr:'',mode:'DRIVE',route:null,routeFor:'',near:null,nearType:'',busy:'',err:''};
+const MAP_STEPS=[['Turn on Routes API and Places API (New) in your TraceyTech Google Cloud project. Billing must be switched on; personal use normally stays inside the free monthly allowance','https://console.cloud.google.com/apis/library/routes.googleapis.com'],['Also turn on Places API (New)','https://console.cloud.google.com/apis/library/places.googleapis.com'],['Create an API key and restrict it to just those two APIs','https://console.cloud.google.com/apis/credentials'],['Open Connections, Google Maps, paste the key and press Save key']];
+async function loadMaps(){try{const r=await api('/api/maps/status');MAPS.configured=!!r.configured;}catch(e){MAPS.configured=false;}}
+function getPos(){return new Promise(res=>{if(!navigator.geolocation){MAPS.posErr='This device cannot share its location.';return res(null);}
+  navigator.geolocation.getCurrentPosition(p=>{MAPS.pos={lat:p.coords.latitude,lng:p.coords.longitude,at:Date.now()};MAPS.posErr='';res(MAPS.pos);},e=>{MAPS.posErr=e.code===1?'Location is blocked. Allow it for TraceyTech in your phone or app settings, then try again.':'Could not get your location. Try again outdoors or with signal.';res(null);},{enableHighAccuracy:false,timeout:12000,maximumAge:120000});});}
+const virtualWhere=w=>!w||/^https?:|zoom|teams|meet\.google|video call|webex|phone|call$/i.test(w);
+function nextPlace(){const now=Date.now();return (S.upcoming||[]).find(e=>e.end>now&&e.start-now<36*36e5&&!virtualWhere(e.where))||null;}
+const dirUrl=(dest,mode)=>'https://www.google.com/maps/dir/?api=1'+(MAPS.pos?`&origin=${MAPS.pos.lat},${MAPS.pos.lng}`:'')+`&destination=${encodeURIComponent(dest)}&travelmode=${({DRIVE:'driving',WALK:'walking',TRANSIT:'transit',BICYCLE:'bicycling'})[mode]||'driving'}`;
+async function fetchRoute(){const ev=nextPlace();if(!ev||!MAPS.pos||!MAPS.configured)return;const k=ev.id+'|'+MAPS.mode+'|'+MAPS.pos.lat.toFixed(2)+MAPS.pos.lng.toFixed(2);if(MAPS.routeFor===k&&MAPS.route)return;
+  MAPS.busy='route';MAPS.err='';try{const r=await api('/api/maps/route',{lat:MAPS.pos.lat,lng:MAPS.pos.lng,dest:ev.where,mode:MAPS.mode});MAPS.route=r;MAPS.routeFor=k;}catch(e){MAPS.route=null;MAPS.err=e.message;}MAPS.busy='';}
+async function fetchNear(type){if(!MAPS.pos||!MAPS.configured)return;MAPS.busy='near';MAPS.nearType=type;MAPS.err='';try{const r=await api('/api/maps/nearby',{lat:MAPS.pos.lat,lng:MAPS.pos.lng,type});MAPS.near=r.places||[];}catch(e){MAPS.near=null;MAPS.err=e.message;}MAPS.busy='';}
+function refreshMaps(){['there','near'].forEach(id=>{const L=LENSES.find(l=>l.id===id),s=$('lens-'+id);if(s&&L)s.innerHTML=L.pane();});renderLenses();}
+const mapSetup=()=>`<p class="empty">Google Maps is not connected yet. Nothing here is guessed. To switch it on:</p><ol class="steps">${MAP_STEPS.map(s=>`<li>${s[1]?`<a href="${esc(s[1])}" target="_blank" rel="noopener">${esc(s[0])}</a>`:esc(s[0])}</li>`).join('')}</ol>`;
+const locBtn=()=>`<p class="empty">${esc(MAPS.posErr||'I need your location to work this out. It stays on this phone until you ask for a route, then only your coordinates are sent to Google through TraceyTech.')}</p><button type="button" class="act primary" data-mp="loc">Share my location</button>`;
+const hm=d=>hhmm(d);
+const MAPLENS=[{id:'there',type:'work',title:'Getting there',sample:false,
+  score:()=>{const e=nextPlace();if(!e)return 0;const h=(e.start-Date.now())/36e5;return h<=3?88:h<=12?60:40;},
+  why:()=>{const e=nextPlace();if(!e)return '';if(MAPS.route&&MAPS.routeFor.startsWith(e.id)){const leave=new Date(+e.start-MAPS.route.seconds*1000-5*60000);return `Leave by ${hm(leave)} for ${e.title}`;}return `${e.title} at ${hm(e.start)}`;},
+  preview:()=>{const e=nextPlace();if(!e)return '';return MAPS.route&&MAPS.routeFor.startsWith(e.id)?`<span class="big">${Math.round(MAPS.route.seconds/60)}<small> min</small></span>`:'';},
+  pane:()=>{const e=nextPlace();if(!e)return `<header><h2>Getting there</h2></header><p class="empty">Nothing on your calendar in the next day has a place to travel to.</p>`;
+   const modes=[['DRIVE','Drive'],['TRANSIT','Transit'],['WALK','Walk'],['BICYCLE','Cycle']];
+   let body='';
+   if(!MAPS.configured)body=mapSetup();else if(!MAPS.pos)body=locBtn();
+   else if(MAPS.busy==='route')body='<p class="empty">Working it out…</p>';
+   else if(MAPS.route&&MAPS.routeFor.startsWith(e.id)){const r=MAPS.route,leave=new Date(+e.start-r.seconds*1000-5*60000);
+     body=`<div class="mroute"><span class="big">${Math.round(r.seconds/60)}<small> min</small></span><p>${(r.meters/1609.34).toFixed(1)} miles. Leave by <b>${hm(leave)}</b> to arrive five minutes early.</p></div>`;}
+   else body=`<p class="empty">${esc(MAPS.err||'')}</p><button type="button" class="act primary" data-mp="route">Get travel time</button>`;
+   return `<header><h2>Getting there</h2><div class="meta">${hm(e.start)}–${hm(e.end)}</div></header>
+   <div class="d-sec"><h3>${esc(e.title)}</h3><p>${esc(e.where)}</p></div>
+   <div class="mmodes">${modes.map(([k,n])=>`<button type="button" class="${MAPS.mode===k?'on':''}" data-mp="mode" data-v="${k}">${n}</button>`).join('')}</div>
+   ${body}
+   <p><a class="act" href="${esc(dirUrl(e.where,MAPS.mode))}" target="_blank" rel="noopener">Open directions in Google Maps</a></p>
+   ${rbHtml('item:there:'+e.id,e.title+' travel','e.g. I will be coming from work')}`;}},
+{id:'near',type:'idea',title:'Near you',sample:false,
+  score:()=>MAPS.pos&&MAPS.configured?30:22,
+  why:()=>!MAPS.configured?'Turn on Google Maps':!MAPS.pos?'Share your location':'Fuel, coffee, parking and more',
+  preview:()=>'',
+  pane:()=>{const types=[['gas_station','Fuel'],['cafe','Coffee'],['pharmacy','Pharmacy'],['parking','Parking'],['electric_vehicle_charging_station','EV charging'],['atm','Cash machine'],['restaurant','Food']];
+   let body='';
+   if(!MAPS.configured)body=mapSetup();else if(!MAPS.pos)body=locBtn();
+   else body=`<div class="mmodes">${types.map(([k,n])=>`<button type="button" class="${MAPS.nearType===k?'on':''}" data-mp="near" data-v="${k}">${n}</button>`).join('')}</div>
+     ${MAPS.busy==='near'?'<p class="empty">Looking…</p>':MAPS.err?`<p class="empty">${esc(MAPS.err)}</p>`:MAPS.near?(MAPS.near.length?`<div class="plist">${MAPS.near.map(p=>`<article><div><b>${esc(p.name)}</b><p>${esc(p.addr)}${p.rating?` · ${p.rating}★`:''}</p></div><a class="by" href="${esc(p.url||dirUrl(p.addr,'DRIVE'))}" target="_blank" rel="noopener">${p.open===true?'Open':p.open===false?'Closed':'Map'}</a></article>`).join('')}</div>`:'<p class="empty">Nothing found close by.</p>'):'<p class="empty">Pick what you need.</p>'}`;
+   return `<header><h2>Near you</h2><div class="meta">${MAPS.pos?'Within about a mile':''}</div></header>${body}`;}}];
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-mp]');if(!b)return;const a=b.dataset.mp;
+  if(a==='loc'){b.disabled=true;await getPos();if(MAPS.pos){await fetchRoute();}refreshMaps();return;}
+  if(a==='mode'){MAPS.mode=b.dataset.v;MAPS.route=null;MAPS.routeFor='';refreshMaps();await fetchRoute();refreshMaps();return;}
+  if(a==='route'){await fetchRoute();refreshMaps();return;}
+  if(a==='near'){refreshMaps();await fetchNear(b.dataset.v);refreshMaps();}
+});
+function mapsBlock(){return `<div class="gcs"><div class="cam"><input type="password" id="mk-in" maxlength="80" placeholder="Google Maps API key" autocomplete="off"><button type="button" data-ca="maps-save">Save key</button>${MAPS.configured?'<button type="button" data-ca="maps-rm">Remove</button>':''}</div>
+  <p class="gp2">Encrypted before it is saved, and only used from the server. Needs Routes API and Places API (New) switched on.</p></div>`;}
+
 /* ---------- real Gmail and Calendar: summaries only, nothing is sent or changed ---------- */
 const decode=s=>String(s||'').replace(/&#39;/g,"'").replace(/&quot;/g,'"').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/\s+/g,' ').trim();
 function mapMail(x){const m=/^\s*"?([^"<]*?)"?\s*<([^>]+)>\s*$/.exec(x.from||'');const addr=(m?m[2]:x.from||'').toLowerCase(),name=decode((m&&m[1])||addr.split('@')[0]||'Unknown');
@@ -665,7 +742,8 @@ function clashes(){
         fix:p.kind==='work'?'Ask to move it to a rest day ('+shortDay(nextRest(p.start))+') or take the time as leave.':p.kind==='family'?'Ask for a rest-day swap or a few hours of leave now. Christmas and family dates go fast.':'Swap the shift, or move the plan to your next rest day: '+shortDay(nextRest(p.start))+'.'});return;}}
     const s=shiftOn(p.start);if(s.c!=='R'&&s.start>p.end&&s.start-p.end<2*36e5)out.push({p,s,level:'tight',why:`It finishes ${dur(s.start-p.end)} before your ${s.name.toLowerCase()} shift at ${hhmm(s.start)}.`,
       fix:p.kind==='work'?'Only a short gap before your shift. I would set a reminder to wrap up five minutes early.':'Book it for '+hhmm(new Date(+p.start-36e5))+' so you can still rest before the shift, or swap the night.'});
-  });return out.sort((a,b)=>a.p.start-b.p.start);
+  });const all=out.sort((a,b)=>a.p.start-b.p.start);const hid=c=>{const a=S.answers[clashKey(c.p)];return a&&(a.effect==='resolved'||a.effect==='ignore');};
+  S.handled=all.filter(hid);return all.filter(c=>!hid(c));
 }
 function nextRest(d){for(let i=0;i<20;i++){const x=new Date(+new Date(d)+i*DAY);if(shiftOn(x).c==='R')return x;}return d;}
 function restDays(from,to){const o=[];for(let t=+new Date(from).setHours(0,0,0,0);t<=+to;t+=DAY)if(shiftOn(t).c==='R')o.push(new Date(t));return o;}
@@ -679,8 +757,9 @@ const LENSES=[
     return `<span class="big ${n?'crit':''}">${c.length}</span><span class="row1">${n} clash${n===1?'':'es'}, ${c.length-n} tight</span><span class="lbl">Next: ${esc(f?shortDay(f.p.start)+' · '+f.p.title:'')}</span>`;},
   pane:()=>`<header><h2>Clashes</h2><div class="meta">Your plans checked against your real rota <span class="real">Live</span></div></header>
    <div class="clist">${S.clash.map((c,i)=>`<article class="cl ${c.level}"><div class="cl-h"><b>${esc(c.level==='clash'?'Clash':'Tight')}</b><span>${esc(dayLabel(c.p.start))}</span></div>
-   <h3>${esc(c.p.title)} <small>${c.multi?esc(shortDay(c.p.start)+' to '+shortDay(new Date(+c.p.end-DAY))):hhmm(c.p.start)+'–'+hhmm(c.p.end)}</small>${c.p.sample?' <span class="sample">Sample</span>':' <span class="real">From your calendar</span>'}</h3><p>${esc(c.why)}</p><p class="fix">${esc(c.fix)}</p>
-   ${c.p.kind==='work'?'':`<button type="button" class="act" data-draft="${i}">${c.multi?'Draft a leave request':'Draft a swap request'}</button>`}<div class="drafted" id="swap-${i}" hidden></div></article>`).join('')||'<p class="empty">No clashes in the next month.</p>'}</div>`},
+   <h3>${esc(c.p.title)} <small>${c.multi?esc(shortDay(c.p.start)+' to '+shortDay(new Date(+c.p.end-DAY))):hhmm(c.p.start)+'–'+hhmm(c.p.end)}</small>${c.p.kind==='trip'?' <span class="real">From you</span>':' <span class="real">From your calendar</span>'}</h3><p>${esc(c.why)}</p><p class="fix">${esc(c.fix)}</p>
+   ${c.p.kind==='work'?'':`<button type="button" class="act" data-draft="${i}">${c.multi?'Draft a leave request':'Draft a swap request'}</button>`}<div class="drafted" id="swap-${i}" hidden></div>${rbHtml(clashKey(c.p),c.p.title+' clashes with a shift',c.multi?'e.g. my leave is already booked':'e.g. already sorted, or what has changed')}</article>`).join('')||'<p class="empty">No clashes in the next month.</p>'}</div>
+   ${(S.handled||[]).length?`<h3 class="ch3">Handled by you</h3><div class="clist">${S.handled.map(c=>`<article class="cl"><div class="cl-h"><b>Handled</b><span>${esc(dayLabel(c.p.start))}</span></div><h3>${esc(c.p.title)}</h3>${rbHtml(clashKey(c.p),c.p.title,'Changed your mind? Tell me')}</article>`).join('')}</div>`:''}`},
  {id:'birthday',type:'personal',title:"Wife's birthday",sample:false,score:()=>{const d=days(S.life.birthday);return d<0?0:d<=14?88:d<=30?62:d<=90?36:14;},
   why:()=>{const d=days(S.life.birthday);return d>120?`Plenty of time. I'd start planning in ${new Date(+S.life.birthday-90*DAY).toLocaleDateString('en-GB',{month:'long',timeZone:TZ})}`:`${d} days to go`;},
   preview:()=>{const b=S.life.birthday,d=days(b),s=shiftOn(b);return `<span class="big">${d}<small> days</small></span><span class="row1">${esc(shortDay(b))} 2027 · ${esc(s.proj?'rota not out yet':shiftTxt(s))}</span><span class="lbl">Start planning ${esc(new Date(+b-90*DAY).toLocaleDateString('en-GB',{month:'long',timeZone:TZ}))}. Leave, gift, table</span>`;},
@@ -764,6 +843,7 @@ function connItems(){
   {const S2=GOAT.sites||[],bad=S2.filter(x=>!x.ok);items.push({name:'GoatCounter',state:!S2.length?'off':bad.length?'dropped':'ok',
     why:!S2.length?'No sites added yet':bad.length?`${bad.map(x=>x.code).join(', ')} not answering`:`${S2.length} site${S2.length>1?'s':''}, ${S2.reduce((n,x)=>n+(x.week||0),0)} visitors this week`,
     fix:bad.length?bad.map(x=>['Open '+x.code+' API settings',`https://${x.code}.goatcounter.com/user/api`]):[['How to get a token','https://www.goatcounter.com/']]});}
+  items.push({name:'Google Maps',state:MAPS.configured?'ok':'off',why:MAPS.configured?'Directions and places near you':'No key yet',fix:MAP_STEPS.filter(s=>s[1]).slice(0,3).map(s=>[s[0].slice(0,34)+(s[0].length>34?'…':''),s[1]])});
   CONNECT.slice(1).filter(c=>c.name!=='GoatCounter').forEach(c=>{const st=connState(c);items.push({name:c.name,state:st==='ok'?'ok':'off',why:c.steps.length?`Not connected. ${c.time||''}`.trim():'No route in',fix:(c.steps||[]).filter(s=>s[1]).slice(0,2).map(s=>[s[0].slice(0,34)+(s[0].length>34?'…':''),s[1]])});});
   return items.map(i=>{const r=CS.rows[i.name];const own=r&&r.status;return {...i,own,note:r&&r.note||'',eff:own==='paused'||own==='archived'||own==='deleted'?own:i.state};});
 }
@@ -778,7 +858,7 @@ function connPane(){
     return `<article class="cn ${i.eff}"><div class="ch"><i></i><b>${esc(i.name)}</b><em>${esc(CST[i.eff])}</em></div>
     <p>${esc(i.eff==='paused'?'Paused. I will not alert you about it':i.why)}${i.note?` <span class="cnote">${esc(i.note)}</span>`:''}</p>
     ${bad||i.eff==='off'?`<div class="cfix">${i.fix.map(f=>`<a href="${esc(f[1])}" ${f[1][0]==='/'?'':'target="_blank" rel="noopener"'}>${esc(f[0])}</a>`).join('')}</div>`:''}
-    ${i.name==='GoatCounter'&&!['archived','deleted'].includes(i.own)?goatBlock():''}
+    ${i.name==='GoatCounter'&&!['archived','deleted'].includes(i.own)?goatBlock():''}${i.name==='Google Maps'&&!['archived','deleted'].includes(i.own)?mapsBlock():''}
     <div class="cact">${i.own==='archived'||i.own==='deleted'?`<button type="button" data-ca="restore" data-n="${esc(i.name)}">Restore</button>`:
       `<button type="button" data-ca="test" data-n="${esc(i.name)}"${CS.busy===i.name?' disabled':''}>${CS.busy===i.name?'Testing…':'Test'}</button>
       <button type="button" data-ca="${i.own==='paused'?'resume':'pause'}" data-n="${esc(i.name)}">${i.own==='paused'?'Resume':'Pause'}</button>
@@ -800,8 +880,11 @@ LENSES.push({id:'conns',type:'system',title:'Connections',sample:false,
   preview:()=>{const b=connItems().filter(i=>i.eff==='dropped').length;return `<span class="big">${b?b:'OK'}</span>`;},
   pane:connPane});
 LENSES.find(l=>l.id==='conns').urgentWhen=()=>connItems().some(i=>i.eff==='dropped');
+LENSES.push(...MAPLENS);
 function refreshConns(){const s=$('lens-conns');if(s)s.innerHTML=connPane();const t=document.querySelector('[data-lens="conns"]');if(t){const L=LENSES.find(l=>l.id==='conns');t.querySelector('.tp').innerHTML=L.preview();const w=t.querySelector('.lwhy');if(w)w.textContent=L.why();}}
 document.addEventListener('click',async e=>{const b=e.target.closest('[data-ca]');if(!b)return;const n=b.dataset.n,a=b.dataset.ca;
+  if(a==='maps-save'){const key=$('mk-in').value.trim();if(!key)return;b.disabled=true;b.textContent='Checking…';try{await api('/api/maps/key',{key});MAPS.configured=true;toast('<b>Google Maps connected.</b>');}catch(er){toast(`<b>Not saved.</b> ${esc(er.message)}`);}refreshConns();refreshMaps();return;}
+  if(a==='maps-rm'){try{await api('/api/maps/key',{remove:true});MAPS.configured=false;MAPS.route=null;MAPS.near=null;}catch(er){toast(`<b>Not removed.</b> ${esc(er.message)}`);}refreshConns();refreshMaps();return;}
   if(a==='goat-add'){const code=$('gc-code').value.trim(),token=$('gc-tok').value.trim();if(!code||!token){toast('<b>Need both.</b> The site code and the read token.');return;}
     b.disabled=true;b.textContent='Checking…';try{await api('/api/goat/add',{code,token});await loadGoat();toast(`<b>Added.</b> ${esc(code)} is answering.`);}catch(er){toast(`<b>Not added.</b> ${esc(er.message)}`);}
     renderLenses();refreshConns();return;}
@@ -878,7 +961,7 @@ async function load(){
   if(!sceneOn){sceneOn=true;initEnv();env.live=true;if(reduce||!$('env'))setInterval(()=>{const m=env.pick();if(m)env.onPulse(m);},4000);}
   env.setGraph(S.graph);if(document.body.classList.contains('map'))buildLabels();
   composeVoice();renderChain();renderDeck();renderIdeas();renderInbox();renderAhead();renderToday();renderPulse();renderSources();renderGoogle();renderLearned();
-  renderPreviews();loadGoogle().then(loadFeed);loadGoat().then(()=>{renderLenses();refreshConns();});if(!CS.loaded)loadConns().then(()=>{renderLenses();refreshConns();});
+  renderPreviews();loadGoogle().then(loadFeed);loadGoat().then(()=>{renderLenses();refreshConns();});loadMaps().then(()=>{if(navigator.permissions&&navigator.permissions.query)navigator.permissions.query({name:'geolocation'}).then(p=>{if(p.state==='granted')getPos().then(()=>fetchRoute()).then(refreshMaps);}).catch(()=>{});else refreshMaps();});loadAnswers().then(()=>{if(S.clash)refreshClash();});if(!CS.loaded)loadConns().then(()=>{renderLenses();refreshConns();});
   if(/[?&]google=connected/.test(location.search)){history.replaceState(null,'','/');toast('<b>Google connected.</b> Open Plugged in and press Test every service.');}
 }
 const clock=()=>{$('clock').textContent=hhmm(Date.now());tickNow(false);};clock();setInterval(clock,20000);
