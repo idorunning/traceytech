@@ -1,0 +1,8 @@
+<resources>
+    <color name="void_bg">#09090A</color>
+    <color name="graphite">#18181A</color>
+    <color name="paper">#EFEDE8</color>
+    <color name="ash">#8F8E8A</color>
+    <color name="signal">#E5322B</color>
+    <color name="icon_bg">#09090A</color>
+</resources>

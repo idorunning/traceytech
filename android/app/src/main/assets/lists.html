@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Lists</title>
+<link rel="stylesheet" href="common.css">
+<style>
+.chips{display:flex;gap:8px;overflow-x:auto;padding:4px 18px 14px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;display:flex;align-items:center;gap:8px;border:1px solid var(--line2);border-radius:999px;padding:8px 14px;font-size:14px;color:var(--mist);user-select:none}
+.chip .sw{width:8px;height:8px;border-radius:50%}
+.chip .n{font:12px ui-monospace,Menlo,monospace;color:var(--ash)}
+.chip.on{background:var(--paper);color:var(--void);border-color:var(--paper);font-weight:600}
+.chip.on .n{color:#09090a99}
+main{padding:0 14px 120px}
+.group{margin:6px 4px 4px;font:500 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--ash);display:flex;align-items:center;gap:8px;padding:14px 0 8px}
+.group .sw{width:7px;height:7px;border-radius:50%}
+.item{display:flex;align-items:flex-start;gap:12px;padding:13px 14px;margin-bottom:8px}
+.tick{flex:none;width:24px;height:24px;border-radius:50%;border:1.6px solid var(--line2);margin-top:1px;display:grid;place-items:center;transition:all .15s}
+.tick.done{background:var(--paper);border-color:var(--paper)}
+.tick.done::after{content:"";width:9px;height:5px;border:2px solid var(--void);border-top:0;border-right:0;transform:rotate(-45deg) translate(1px,-1px)}
+.body{flex:1;min-width:0}
+.txt{word-wrap:break-word}
+.item.done .txt{color:var(--ash);text-decoration:line-through}
+.meta{display:flex;gap:10px;flex-wrap:wrap;margin-top:3px;font-size:12.5px;color:var(--ash)}
+.meta .late{color:#ff8a83}
+.meta .soon{color:var(--warn)}
+.empty{text-align:center;color:var(--ash);padding:48px 20px}
+.donehead{display:flex;justify-content:space-between;align-items:center;width:100%;padding:16px 4px 8px;color:var(--ash);font-size:13px}
+.composer{position:fixed;left:0;right:0;bottom:0;padding:10px 12px 12px;background:linear-gradient(transparent,#09090a 28%);z-index:10}
+.composer .box{display:flex;gap:8px;align-items:center;padding:6px 6px 6px 14px;border-radius:999px}
+.composer input{flex:1;background:none;border:0;outline:none;padding:8px 0;min-width:0}
+.composer .due{font-size:12.5px;color:var(--mist);border:1px solid var(--line2);border-radius:999px;padding:7px 10px;white-space:nowrap}
+.composer .due.set{border-color:var(--warn);color:var(--warn)}
+.composer .add{width:38px;height:38px;border-radius:50%;background:var(--paper);color:var(--void);font-size:22px;line-height:38px;text-align:center;flex:none}
+.note{margin:0 18px 10px;padding:10px 12px;font-size:13px;color:var(--mist)}
+.colors{display:flex;gap:10px;margin-top:6px}
+.colors button{width:30px;height:30px;border-radius:50%;border:2px solid transparent}
+.colors button.on{border-color:var(--paper)}
+</style>
+</head>
+<body>
+<header class="top">
+  <div><p class="eyebrow" id="eyebrow">To-do</p><h1>Lists</h1></div>
+  <button class="pill" id="newList">+ New list</button>
+</header>
+<div id="mode"></div>
+<div class="chips" id="chips"></div>
+<main id="main"><p class="empty">Loading…</p></main>
+<div class="composer"><div class="box card">
+  <input id="txt" placeholder="Add a to-do" enterkeyhint="done" autocomplete="off">
+  <button class="due" id="dueBtn">Due</button>
+  <button class="add" id="addBtn" aria-label="Add">+</button>
+</div></div>
+<script src="common.js"></script>
+<script>
+'use strict';
+const COLORS=['#efede8','#e5322b','#e3b341','#3fb950','#58a6ff','#bc8cff','#ff7eb6','#8f8e8a'];
+const DEFAULTS=[{id:'general',name:'General',cat:'general',color:'#efede8'},{id:'shopping',name:'Shopping',cat:'shopping',color:'#3fb950'},
+  {id:'town',name:'Town',cat:'town',color:'#58a6ff'},{id:'work',name:'Work',cat:'work',color:'#e3b341'}];
+let S={mode:'',lists:[],todos:[],sel:'all',showDone:false,due:''};
+try{S.sel=localStorage.getItem('cio_sel')||'all';}catch(e){}
+
+/* ---------- two stores: the server's lists, or lists kept on this phone ---------- */
+const local={
+  get lists(){try{return JSON.parse(localStorage.getItem('cio_lists')||'[]');}catch(e){return [];}},
+  set lists(v){localStorage.setItem('cio_lists',JSON.stringify(v));},
+  get map(){try{return JSON.parse(localStorage.getItem('cio_map')||'{}');}catch(e){return {};}},
+  set map(v){localStorage.setItem('cio_map',JSON.stringify(v));}
+};
+function fromRows(rows){const m=local.map;return rows.map(t=>({id:t.id,text:t.text,due:t.due||'',state:t.state||'open',list:String(m[t.id]||t.cat||'general')}));}
+
+async function load(quiet){
+  if(!S.lists.length){const c=N&&N.cached('lists');if(c)try{const j=JSON.parse(c);S.mode='server';S.lists=j.lists.map(l=>({...l,id:String(l.id)}));S.todos=j.todos.map(t=>({...t,list:String(t.list)}));render();}catch(e){}}
+  const r=await api('GET','/api/lists');
+  if(r.ok){S.mode='server';S.lists=(r.json.lists||[]).map(l=>({...l,id:String(l.id)}));S.todos=(r.json.todos||[]).map(t=>({...t,list:String(t.list)}));}
+  else if(r.code===404){const t=await api('GET','/api/todos');
+    if(t.ok){S.mode='local';S.lists=[...DEFAULTS,...local.lists];S.todos=fromRows(t.json.rows||[]);}
+    else return fail(t);}
+  else return fail(r);
+  if(S.sel!=='all'&&!S.lists.some(l=>l.id===S.sel))S.sel='all';
+  render();
+}
+function fail(r){if(r.code===401){$('#main').innerHTML='<p class="empty">Sign in on the Home tab first.<br><br><button class="pill" onclick="Native.open(\'home\')">Go to Home</button></p>';return;}
+  if(!S.todos.length)$('#main').innerHTML='<p class="empty">'+esc(r.json.error||'Could not load your lists.')+'<br><br><button class="pill" onclick="load()">Try again</button></p>';
+  else toast(esc(r.json.error||'Offline. Showing the last copy.'));}
+
+async function post(body){const r=await api('POST','/api/lists',body);if(!r.ok)toast('<b>Not saved.</b> '+esc(r.json.error||('Error '+r.code)));return r;}
+
+const store={
+  async add(list,text,due){
+    if(S.mode==='server')return (await post({op:'add',list:Number(list),text,due})).ok;
+    const l=S.lists.find(x=>x.id===list)||DEFAULTS[0];
+    const r=await api('POST','/api/todos',{text,cat:l.cat||'general',due});if(!r.ok){toast('<b>Not added.</b> '+esc(r.json.error||''));return false;}
+    if(!l.cat&&r.json.id){const m=local.map;m[r.json.id]=l.id;local.map=m;}return true;},
+  async state(id,st){
+    if(S.mode==='server')return (await post({op:'state',todo:id,state:st})).ok;
+    const r=await api('POST','/api/todos',{id,state:st});if(!r.ok)toast('<b>Not saved.</b> '+esc(r.json.error||''));return r.ok;},
+  async move(id,list){
+    if(S.mode==='server')return (await post({op:'move',todo:id,list:Number(list)})).ok;
+    const m=local.map;m[id]=list;local.map=m;return true;},
+  async edit(id,text,due){
+    if(S.mode==='server')return (await post({op:'edit',todo:id,text,due})).ok;
+    toast('Editing needs the lists feature on the server.');return false;},
+  async create(name,color){
+    if(S.mode==='server')return (await post({op:'create',name,color})).json.id;
+    const id='c'+Date.now();local.lists=[...local.lists,{id,name,color}];return id;},
+  async rename(id,name,color){
+    if(S.mode==='server')return (await post({op:'rename',id:Number(id),name,color})).ok;
+    local.lists=local.lists.map(l=>l.id===id?{...l,name,color}:l);return true;},
+  async remove(id){
+    if(S.mode==='server')return (await post({op:'delete',id:Number(id)})).ok;
+    local.lists=local.lists.filter(l=>l.id!==id);const m=local.map;for(const k in m)if(m[k]===id)delete m[k];local.map=m;return true;}
+};
+
+/* ---------- dates ---------- */
+function dueAt(d){if(!d)return null;if(/^\d{4}-\d{2}-\d{2}$/.test(d)){const t=new Date(d+'T09:00');return isNaN(t)?null:t;}
+  if(/^\d{4}-\d{2}-\d{2}T/.test(d)){const t=new Date(d);return isNaN(t)?null:t;}return null;}
+function dueLabel(d){const t=dueAt(d);if(!t)return d?{txt:d[0].toUpperCase()+d.slice(1),cls:''}:null;
+  const now=new Date(),day=x=>new Date(x.getFullYear(),x.getMonth(),x.getDate()).getTime();
+  const diff=Math.round((day(t)-day(now))/864e5);const hasTime=d.length>10;
+  const hm=hasTime?' '+t.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'';
+  const name=diff===0?'Today':diff===1?'Tomorrow':diff===-1?'Yesterday':(diff>1&&diff<7?t.toLocaleDateString('en-GB',{weekday:'long'}):t.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'}));
+  const late=t<now;return {txt:name+hm,cls:late?'late':(t-now<3*36e5?'soon':'')};}
+function isoLocal(t){const p=n=>String(n).padStart(2,'0');return t.getFullYear()+'-'+p(t.getMonth()+1)+'-'+p(t.getDate())+'T'+p(t.getHours())+':'+p(t.getMinutes());}
+function sortOpen(a,b){const x=dueAt(a.due),y=dueAt(b.due);if(x&&y)return x-y;if(x)return -1;if(y)return 1;return b.id-a.id;}
+
+/* ---------- drawing ---------- */
+function listOf(id){return S.lists.find(l=>l.id===id)||S.lists[0]||DEFAULTS[0];}
+function render(){
+  $('#mode').innerHTML=S.mode==='local'?'<div class="note card">Your own lists are kept on this phone for now. Items still sync with TraceyTech.</div>':'';
+  const open=S.todos.filter(t=>t.state==='open');
+  const count=id=>open.filter(t=>t.list===id).length;
+  $('#chips').innerHTML=[`<button class="chip${S.sel==='all'?' on':''}" data-l="all">All <span class="n">${open.length}</span></button>`,
+    ...S.lists.map(l=>`<button class="chip${S.sel===l.id?' on':''}" data-l="${esc(l.id)}"><span class="sw" style="background:${esc(l.color||'#efede8')}"></span>${esc(l.name)} <span class="n">${count(l.id)}</span></button>`)].join('');
+  $('#eyebrow').textContent=open.length?open.length+' open':'All clear';
+  $('#txt').placeholder=S.sel==='all'?'Add to General':'Add to '+listOf(S.sel).name;
+  const inSel=t=>S.sel==='all'||t.list===S.sel;
+  const items=open.filter(inSel).sort(sortOpen), done=S.todos.filter(t=>t.state==='done'&&inSel(t));
+  let h='';
+  if(S.sel==='all'){for(const l of S.lists){const g=items.filter(t=>t.list===l.id);if(!g.length)continue;
+      h+=`<div class="group"><span class="sw" style="background:${esc(l.color||'#efede8')}"></span>${esc(l.name)}</div>`+g.map(row).join('');}
+    const orphan=items.filter(t=>!S.lists.some(l=>l.id===t.list));if(orphan.length)h+='<div class="group">Other</div>'+orphan.map(row).join('');}
+  else h=items.map(row).join('');
+  if(!items.length)h='<p class="empty">'+(S.sel==='all'?'Nothing to do. Add something below.':'Nothing on this list yet.')+'</p>';
+  if(done.length){h+=`<button class="donehead" id="doneToggle"><span>Done recently (${done.length})</span><span>${S.showDone?'Hide':'Show'}</span></button>`;
+    if(S.showDone)h+=done.map(row).join('');}
+  $('#main').innerHTML=h;
+  try{localStorage.setItem('cio_sel',S.sel);}catch(e){}
+}
+function row(t){const d=dueLabel(t.due),l=listOf(t.list);
+  return `<div class="item card${t.state==='done'?' done':''}" data-t="${t.id}"><button class="tick${t.state==='done'?' done':''}" data-tick="${t.id}" aria-label="Done"></button>
+  <div class="body"><div class="txt">${esc(t.text)}</div><div class="meta">${d?`<span class="${d.cls}">${esc(d.txt)}</span>`:''}${S.sel==='all'?'':''}${S.sel!=='all'||!l?'':''}</div></div></div>`;}
+
+/* ---------- actions ---------- */
+document.addEventListener('click',async e=>{
+  const chip=e.target.closest('.chip');if(chip){S.sel=chip.dataset.l;render();return;}
+  const tick=e.target.closest('[data-tick]');if(tick){const id=Number(tick.dataset.tick),t=S.todos.find(x=>x.id===id);if(!t)return;
+    const to=t.state==='done'?'open':'done';const was=t.state;t.state=to;haptic();render();
+    if(!(await store.state(id,to))){t.state=was;render();}else if(to==='done')toast('Done. <u id="undo" data-u="'+id+'">Undo</u>',4000);return;}
+  if(e.target.id==='undo'){const id=Number(e.target.dataset.u),t=S.todos.find(x=>x.id===id);if(t){t.state='open';render();await store.state(id,'open');}return;}
+  if(e.target.closest('#doneToggle')){S.showDone=!S.showDone;render();return;}
+  const it=e.target.closest('.item');if(it){itemSheet(Number(it.dataset.t));return;}
+});
+let pressT=null;
+document.addEventListener('touchstart',e=>{const c=e.target.closest('.chip');if(!c||c.dataset.l==='all')return;pressT=setTimeout(()=>{haptic();listSheet(c.dataset.l);},520);},{passive:true});
+['touchend','touchmove','touchcancel'].forEach(ev=>document.addEventListener(ev,()=>clearTimeout(pressT),{passive:true}));
+
+$('#addBtn').onclick=add;
+$('#txt').addEventListener('keydown',e=>{if(e.key==='Enter')add();});
+async function add(){const text=$('#txt').value.trim();if(text.length<2){toast('Write the to-do first.');return;}
+  const list=S.sel==='all'?(S.lists.find(l=>l.cat==='general')||S.lists[0]).id:S.sel;
+  $('#addBtn').disabled=true;const ok=await store.add(list,text,S.due);$('#addBtn').disabled=false;
+  if(ok){$('#txt').value='';S.due='';dueBtn();haptic();await load(true);}}
+function dueBtn(){const b=$('#dueBtn'),d=dueLabel(S.due);b.textContent=d?d.txt:'Due';b.classList.toggle('set',!!S.due);}
+$('#dueBtn').onclick=()=>pickDue(S.due,v=>{S.due=v;dueBtn();});
+
+function pickDue(cur,done){const now=new Date();const at=(d,h)=>{const t=new Date(now);t.setDate(t.getDate()+d);t.setHours(h,0,0,0);return isoLocal(t);};
+  const inH=h=>{const t=new Date(now.getTime()+h*36e5);t.setMinutes(0,0,0);return isoLocal(t);};
+  const opts=[['In 1 hour',inH(1)],['This evening',at(0,18)],['Tomorrow morning',at(1,9)],['Tomorrow evening',at(1,18)],['Saturday',(()=>{const t=new Date(now);t.setDate(t.getDate()+((6-t.getDay()+7)%7||7));t.setHours(10,0,0,0);return isoLocal(t);})()],['Next week',at(7,9)]];
+  const s=sheet(`<h2>When is it due?</h2><div class="wrap">${opts.map(o=>`<button class="pill" data-v="${o[1]}">${o[0]}</button>`).join('')}</div>
+    <label class="f">Pick a date and time</label><input class="t" type="datetime-local" id="dt" value="${esc(cur&&cur.length>10?cur.slice(0,16):'')}">
+    <div class="actions"><button class="pill" data-v="">No due date</button><button class="pill solid" id="dtok">Set</button></div>`);
+  s.onclick=e=>{const b=e.target.closest('[data-v]');if(b){done(b.dataset.v);closeSheet();}};
+  $('#dtok',s).onclick=()=>{done($('#dt',s).value);closeSheet();};}
+
+function itemSheet(id){const t=S.todos.find(x=>x.id===id);if(!t)return;let due=t.due,list=t.list;
+  const s=sheet(`<h2>To-do</h2><textarea class="t" id="et" rows="2">${esc(t.text)}</textarea>
+    <label class="f">Due</label><button class="pill" id="edue"></button>
+    <label class="f">List</label><div class="wrap" id="elist">${S.lists.map(l=>`<button class="chip${l.id===list?' on':''}" data-m="${esc(l.id)}"><span class="sw" style="background:${esc(l.color||'#efede8')}"></span>${esc(l.name)}</button>`).join('')}</div>
+    <div class="actions"><button class="pill danger" id="eign">Remove</button><button class="pill" id="edone">${t.state==='done'?'Not done':'Done'}</button><button class="pill solid" id="esave">Save</button></div>`);
+  const dl=()=>{const d=dueLabel(due);$('#edue',s).textContent=d?d.txt:'No due date';};dl();
+  $('#edue',s).onclick=()=>pickDue(due,v=>{due=v;setTimeout(()=>itemSheetKeep(),0);});
+  function itemSheetKeep(){/* the date sheet replaced this one: save straight away */save(true);}
+  $('#elist',s).onclick=e=>{const b=e.target.closest('[data-m]');if(!b)return;list=b.dataset.m;$$('#elist .chip',s).forEach(c=>c.classList.toggle('on',c===b));};
+  $('#eign',s).onclick=async()=>{closeSheet();t.state='ignored';render();if(await store.state(id,'ignored'))toast('Removed. <u id="undo" data-u="'+id+'">Undo</u>',4000);};
+  $('#edone',s).onclick=async()=>{closeSheet();const to=t.state==='done'?'open':'done';t.state=to;render();await store.state(id,to);};
+  async function save(fromDue){const text=fromDue?t.text:$('#et',s).value.trim();closeSheet();
+    let ok=true;if(text!==t.text||due!==t.due){if(S.mode==='server')ok=await store.edit(id,text,due);else if(text!==t.text)ok=await store.edit(id,text,due);else{toast('Changing a due date needs the lists feature on the server.');ok=false;}}
+    if(ok&&list!==t.list)ok=await store.move(id,list);if(ok){haptic();await load(true);}}
+  $('#esave',s).onclick=()=>save(false);}
+
+function listSheet(id){const l=id?S.lists.find(x=>x.id===id):null;let color=(l&&l.color)||COLORS[4];
+  const builtin=l&&(l.cat||l.builtin);
+  const s=sheet(`<h2>${l?'Edit list':'New list'}</h2><input class="t" id="ln" placeholder="List name" value="${esc(l?l.name:'')}" maxlength="40">
+    <label class="f">Colour</label><div class="colors">${COLORS.map(c=>`<button data-c="${c}" class="${c===color?'on':''}" style="background:${c}"></button>`).join('')}</div>
+    <div class="actions">${l&&!builtin?'<button class="pill danger" id="ldel">Delete list</button>':''}<button class="pill solid" id="lok">${l?'Save':'Create'}</button></div>
+    ${builtin?'<p class="muted" style="font-size:13px;margin-top:14px">This is one of the four built-in TraceyTech lists, so it can be renamed but not deleted.</p>':''}`);
+  $('.colors',s).onclick=e=>{const b=e.target.closest('[data-c]');if(!b)return;color=b.dataset.c;$$('.colors button',s).forEach(x=>x.classList.toggle('on',x===b));};
+  $('#lok',s).onclick=async()=>{const name=$('#ln',s).value.trim();if(!name){toast('Give the list a name.');return;}closeSheet();
+    if(l)await store.rename(id,name,color);else{const nid=await store.create(name,color);if(nid)S.sel=String(nid);}await load(true);};
+  const del=$('#ldel',s);if(del)del.onclick=async()=>{closeSheet();if(await store.remove(id)){S.sel='all';toast('List deleted. Its to-dos moved to General.');await load(true);}};
+  setTimeout(()=>$('#ln',s).focus(),250);}
+$('#newList').onclick=()=>listSheet(null);
+
+window.onNativeShow=()=>load(true);
+window.onNativeReselect=()=>{S.sel='all';render();window.scrollTo({top:0,behavior:'smooth'});load(true);};
+window.onNativeChange=()=>{};
+load();
+</script>
+</body>
+</html>

@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Settings</title>
+<link rel="stylesheet" href="common.css">
+<style>
+main{padding:0 14px 40px}
+section{margin-bottom:14px;padding:4px 0}
+section h2{font:500 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.16em;text-transform:uppercase;color:var(--ash);margin:16px 16px 6px}
+.line{display:flex;align-items:center;gap:12px;padding:13px 16px;border-top:1px solid var(--line)}
+.line:first-of-type{border-top:0}
+.line .l{flex:1;min-width:0}
+.line .s{font-size:13px;color:var(--ash);margin-top:2px}
+.state{font-size:12px;padding:4px 9px;border-radius:999px;border:1px solid var(--line2);white-space:nowrap}
+.state.ok{color:var(--ok);border-color:#3fb95055}
+.state.no{color:#ff9b95;border-color:#e5322b55}
+.sw{position:relative;width:46px;height:28px;flex:none}
+.sw input{opacity:0;width:0;height:0;position:absolute}
+.sw span{position:absolute;inset:0;border-radius:28px;background:#2a2a2d;transition:.2s}
+.sw span::after{content:"";position:absolute;left:3px;top:3px;width:22px;height:22px;border-radius:50%;background:var(--ash);transition:.2s}
+.sw input:checked+span{background:var(--paper)}
+.sw input:checked+span::after{left:21px;background:var(--void)}
+select.t{width:auto;padding:8px 10px}
+.dot{width:10px;height:10px;border-radius:50%;background:#555;flex:none}
+.dot.on{background:var(--ok)}.dot.busy{background:var(--warn)}
+.btns{display:flex;gap:8px;padding:0 16px 14px;flex-wrap:wrap}
+</style>
+</head>
+<body>
+<header class="top"><div><p class="eyebrow">Conductor IO</p><h1>Settings</h1></div></header>
+<main id="main"></main>
+<script src="common.js"></script>
+<script>
+'use strict';
+const PERMS=[['notifications','Notifications','Reminders, calendar, voice notes and email'],
+  ['nearby','Nearby devices','Connects the voice fob over Bluetooth'],
+  ['alarms','Alarms and reminders','Reminders arrive at the exact minute'],
+  ['battery','Battery: Unrestricted','Keeps the fob connected and updates on time. Open, then Battery, then Unrestricted.'],
+  ['location','Location','Nearby places and routes on the Home screen']];
+function sw(k,on){return `<label class="sw"><input type="checkbox" data-p="${k}"${on?' checked':''}><span></span></label>`;}
+function ago(t){if(!t)return 'Not yet';const m=Math.round((Date.now()-t)/6e4);if(m<1)return 'Just now';if(m<60)return m+' min ago';const h=Math.round(m/60);return h<24?h+' h ago':new Date(t).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});}
+function render(){
+  if(!N){$('#main').innerHTML='<p class="muted">Open this inside Conductor IO.</p>';return;}
+  const s=JSON.parse(N.state()),p=s.prefs,f=s.fob;
+  $('#main').innerHTML=`
+  <section class="card"><h2>Voice fob</h2>
+    <div class="line"><span class="dot ${f.connected?'on':f.on?'busy':''}"></span><div class="l"><div>${esc(f.status)}</div><div class="s">${esc(f.detail)}</div></div></div>
+    <div class="btns"><button class="pill solid" data-fob="toggle">${f.on?'Disconnect':'Connect fob'}</button>${f.known?'<button class="pill" data-fob="forget">Forget fob</button>':''}<button class="pill" data-fob="open">Voice notes</button></div>
+  </section>
+  <section class="card"><h2>Notifications</h2>
+    <div class="line"><div class="l">To-do reminders<div class="s">When a to-do is due</div></div>${sw('n_remind',p.n_remind)}</div>
+    <div class="line"><div class="l">Calendar events<div class="s">Before each event starts</div></div>
+      <select class="t" data-p="n_cal_lead">${[0,5,10,15,30,60].map(m=>`<option value="${m}"${p.n_cal_lead===m?' selected':''}>${m?m+' min before':'At the start'}</option>`).join('')}</select>${sw('n_cal',p.n_cal)}</div>
+    <div class="line"><div class="l">New invites</div>${sw('n_invite',p.n_invite)}</div>
+    <div class="line"><div class="l">Voice notes<div class="s">Each recording, and items that wait for you</div></div>${sw('n_voice',p.n_voice)}</div>
+    <div class="line"><div class="l">New email<div class="s">Unread mail that is not a newsletter</div></div>${sw('n_mail',p.n_mail)}</div>
+    <div class="btns"><button class="pill" data-perm="channels">Sounds and style</button></div>
+  </section>
+  <section class="card"><h2>Background updates</h2>
+    <div class="line"><div class="l">Check TraceyTech every<div class="s">Last update: ${esc(ago(s.lastSync))}${s.lastSyncMsg?' · '+esc(s.lastSyncMsg):''}</div></div>
+      <select class="t" data-p="sync_min">${[15,30,60,120].map(m=>`<option value="${m}"${p.sync_min===m?' selected':''}>${m<60?m+' min':(m/60)+' h'}</option>`).join('')}</select></div>
+    <div class="btns"><button class="pill" id="syncNow">Update now</button></div>
+  </section>
+  <section class="card"><h2>Permissions</h2>
+    ${PERMS.map(([k,t,d])=>`<div class="line"><div class="l">${t}<div class="s">${d}</div></div>${s.perm[k]?'<span class="state ok">On</span>':`<button class="pill" data-perm="${k}">Allow</button>`}</div>`).join('')}
+  </section>
+  <section class="card"><h2>Account</h2>
+    <div class="line"><div class="l">TraceyTech<div class="s">${s.signedIn?'Signed in':'Not signed in. Sign in on the Home tab.'}</div></div>${s.signedIn?'<button class="pill danger" id="signOut">Sign out</button>':'<button class="pill" data-tab="home">Sign in</button>'}</div>
+    <div class="line"><div class="l">Google<div class="s">Connect Google once in Chrome at traceytech.app. The app uses the same connection.</div></div><button class="pill" id="google">Open</button></div>
+  </section>
+  <p class="muted" style="text-align:center;font-size:12px">Conductor IO ${esc(s.version)} for TraceyTech</p>`;
+}
+document.addEventListener('change',e=>{const k=e.target.dataset.p;if(!k)return;N.setPref(k,e.target.type==='checkbox'?String(e.target.checked):e.target.value);haptic();});
+document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+  if(b.dataset.perm)N.permission(b.dataset.perm);
+  else if(b.dataset.fob)N.fob(b.dataset.fob);
+  else if(b.dataset.tab)N.open(b.dataset.tab);
+  else if(b.id==='syncNow'){N.syncNow();toast('Updating…');setTimeout(render,4000);}
+  else if(b.id==='google')N.openUrl('https://traceytech.app/');
+  else if(b.id==='signOut'){const s=sheet('<h2>Sign out of TraceyTech?</h2><p class="muted">Reminders and voice notes stop until you sign in again.</p><div class="actions"><button class="pill" id="no">Cancel</button><button class="pill danger" id="yes">Sign out</button></div>');
+    $('#no',s).onclick=closeSheet;$('#yes',s).onclick=()=>{closeSheet();N.signOut();};}
+});
+window.onNativeChange=render;window.onNativeShow=render;window.onNativeReselect=render;
+render();setInterval(()=>{if(document.visibilityState==='visible'&&!document.querySelector('select:focus'))render();},5000);
+</script>
+</body>
+</html>
