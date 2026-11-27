@@ -13,7 +13,8 @@ section h2{font:500 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.16em;tex
 .line:first-of-type{border-top:0}
 .line .l{flex:1;min-width:0}
 .line .s{font-size:13px;color:var(--ash);margin-top:2px}
-.state{font-size:12px;padding:4px 9px;border-radius:999px;border:1px solid var(--line2);white-space:nowrap}
+.state{font-size:14px;min-height:44px;padding:0 12px;border-radius:12px;border:1px solid var(--line2);white-space:nowrap;display:inline-flex;align-items:center;justify-content:center}
+.line>.pill,.line>.state{min-width:92px;flex:none}
 .state.ok{color:var(--ok);border-color:#3fb95055}
 .state.no{color:#ff9b95;border-color:#e5322b55}
 .sw{position:relative;width:46px;height:28px;flex:none}
@@ -22,10 +23,10 @@ section h2{font:500 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.16em;tex
 .sw span::after{content:"";position:absolute;left:3px;top:3px;width:22px;height:22px;border-radius:50%;background:var(--ash);transition:.2s}
 .sw input:checked+span{background:var(--paper)}
 .sw input:checked+span::after{left:21px;background:var(--void)}
-select.t{width:auto;padding:8px 10px}
+select.t{width:auto;min-height:44px;padding:0 10px;border-radius:12px}
 .dot{width:10px;height:10px;border-radius:50%;background:#555;flex:none}
 .dot.on{background:var(--ok)}.dot.busy{background:var(--warn)}
-.btns{display:flex;gap:8px;padding:0 16px 14px;flex-wrap:wrap}
+.btns{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:8px;padding:0 16px 14px}
 </style>
 </head>
 <body>

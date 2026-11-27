@@ -23,8 +23,8 @@ android {
         applicationId = "app.traceytech.conductor"
         minSdk = 33
         targetSdk = 36
-        versionCode = 101
-        versionName = "1.1.0"
+        versionCode = 102
+        versionName = "1.2.0"
     }
 
     signingConfigs {
@@ -60,4 +60,5 @@ dependencies {
     implementation("androidx.activity:activity-ktx:1.10.1")
     implementation("androidx.webkit:webkit:1.14.0")
     implementation("androidx.work:work-runtime-ktx:2.10.1")
+    implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
 }

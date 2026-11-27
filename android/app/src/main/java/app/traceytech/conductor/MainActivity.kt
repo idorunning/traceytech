@@ -14,6 +14,8 @@ import android.os.Bundle
 import android.provider.Settings
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.MotionEvent
+import android.webkit.JavascriptInterface
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.CookieManager
@@ -39,6 +41,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import androidx.webkit.WebViewAssetLoader
 
 class MainActivity : ComponentActivity() {
@@ -68,6 +71,14 @@ class MainActivity : ComponentActivity() {
     private var tab = TAB_HOME
     lateinit var bridge: Bridge
     private val loaded = HashSet<String>()
+    private val swipes = HashMap<WebView, SwipeRefreshLayout>()
+    private val atTop = HashMap<WebView, Boolean>()
+    private var pausedAt = 0L
+    private lateinit var mic: PhoneMic
+    private lateinit var micBtn: Button
+    private lateinit var micTitle: TextView
+    private lateinit var micDetail: TextView
+    private val siteJs by lazy { assets.open("site.js").bufferedReader().use { it.readText() } }
 
     private var geoPending: Pair<String, GeolocationPermissions.Callback>? = null
     private var filePending: ValueCallback<Array<Uri>>? = null
@@ -125,10 +136,15 @@ class MainActivity : ComponentActivity() {
         if (Prefs.of(this).getBoolean(Prefs.FOB_ON, false) && !FobService.running) FobService.start(this)
         bridge.changed()
         if (Net.signedIn()) Sync.now(this)
+        // Back after a while: show fresh information on every tab that has been opened
+        if (pausedAt > 0 && System.currentTimeMillis() - pausedAt > 60_000) refreshAll()
+        pausedAt = 0
     }
 
     override fun onPause() {
         super.onPause()
+        pausedAt = System.currentTimeMillis()
+        if (::mic.isInitialized) mic.stop()
         FobService.listener = null
         CookieManager.getInstance().flush()
     }
@@ -162,9 +178,11 @@ class MainActivity : ComponentActivity() {
 
         voiceBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         voiceBox.addView(fobStrip(), LinearLayout.LayoutParams(-1, -2))
-        voiceBox.addView(voice, LinearLayout.LayoutParams(-1, 0, 1f))
+        voiceBox.addView(micPanel(), LinearLayout.LayoutParams(-1, -2))
+        voiceBox.addView(pull(voice), LinearLayout.LayoutParams(-1, 0, 1f))
+        val homeBox = pull(home); val listsBox = pull(lists); val settingsBox = pull(settings)
 
-        listOf(home, lists, voiceBox, settings).forEach { content.addView(it, FrameLayout.LayoutParams(-1, -1)); it.visibility = View.GONE }
+        listOf(homeBox, listsBox, voiceBox, settingsBox).forEach { content.addView(it, FrameLayout.LayoutParams(-1, -1)); it.visibility = View.GONE }
 
         nav = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -174,10 +192,10 @@ class MainActivity : ComponentActivity() {
         val hair = View(this).apply { setBackgroundColor(0x18EFEDE8) }
         root.addView(hair, LinearLayout.LayoutParams(-1, 1))
         root.addView(nav, LinearLayout.LayoutParams(-1, -2))
-        addTab(TAB_HOME, "Home", R.drawable.ic_tab_home, home)
-        addTab(TAB_LISTS, "Lists", R.drawable.ic_tab_lists, lists)
+        addTab(TAB_HOME, "Home", R.drawable.ic_tab_home, homeBox)
+        addTab(TAB_LISTS, "Lists", R.drawable.ic_tab_lists, listsBox)
         addTab(TAB_VOICE, "Voice", R.drawable.ic_tab_voice, voiceBox)
-        addTab(TAB_SETTINGS, "Settings", R.drawable.ic_tab_settings, settings)
+        addTab(TAB_SETTINGS, "Settings", R.drawable.ic_tab_settings, settingsBox)
 
         ViewCompat.setOnApplyWindowInsetsListener(root) { v, ins ->
             val cut = ins.getInsets(WindowInsetsCompat.Type.displayCutout())
@@ -212,6 +230,34 @@ class MainActivity : ComponentActivity() {
         b.addView(t)
         nav.addView(b, LinearLayout.LayoutParams(0, dp(52), 1f))
         tabs[key] = view to b
+    }
+
+    /** Pull down to refresh. Only starts when the page (or the list under your finger) is at the top. */
+    private fun pull(w: WebView): SwipeRefreshLayout = SwipeRefreshLayout(this).apply {
+        addView(w, ViewGroup.LayoutParams(-1, -1))
+        setColorSchemeColors(0xFFEFEDE8.toInt())
+        setProgressBackgroundColorSchemeColor(0xFF1C1C1F.toInt())
+        setOnChildScrollUpCallback { _, _ -> w.scrollY > 0 || atTop[w] == false }
+        setOnRefreshListener { refresh(w) }
+        swipes[w] = this
+        w.addJavascriptInterface(object {
+            @JavascriptInterface fun top(t: Boolean) { atTop[w] = t }
+        }, "ConductorPage")
+    }
+
+    private fun refresh(w: WebView) {
+        if (Net.signedIn()) Sync.now(this)
+        if (w === home || w === voice) w.reload()
+        else {
+            w.evaluateJavascript("window.onNativeShow&&onNativeShow()", null)
+            w.postDelayed({ swipes[w]?.isRefreshing = false }, 900)
+        }
+    }
+
+    private fun refreshAll() {
+        if (TAB_HOME in loaded) home.reload()
+        if (TAB_VOICE in loaded) voice.reload()
+        localViews().forEach { it.evaluateJavascript("window.onNativeShow&&onNativeShow()", null) }
     }
 
     private fun reselect() {
@@ -262,11 +308,53 @@ class MainActivity : ComponentActivity() {
         row.addView(col, LinearLayout.LayoutParams(0, -2, 1f))
         fobBtn = Button(this).apply {
             isAllCaps = false; textSize = 14f; setTextColor(0xFF09090A.toInt())
-            background = GradientDrawable().apply { cornerRadius = dp(20).toFloat(); setColor(0xFFEFEDE8.toInt()) }
-            setPadding(dp(16), 0, dp(16), 0); minHeight = dp(40); minimumHeight = dp(40)
+            background = GradientDrawable().apply { cornerRadius = dp(12).toFloat(); setColor(0xFFEFEDE8.toInt()) }
+            setPadding(dp(16), 0, dp(16), 0); minHeight = dp(44); minimumHeight = dp(44)
             setOnClickListener { toggleFob() }
         }
-        row.addView(fobBtn, LinearLayout.LayoutParams(-2, dp(40)).apply { leftMargin = dp(10) })
+        row.addView(fobBtn, LinearLayout.LayoutParams(-2, dp(44)).apply { leftMargin = dp(10) })
+        return row
+    }
+
+    /** Hold to talk with the phone's own microphone: for when the fob isn't with you. */
+    private fun micPanel(): View {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(16), dp(12), dp(12), dp(12))
+            background = GradientDrawable().apply { setColor(0xFF111113.toInt()); setStroke(1, 0x22EFEDE8) }
+        }
+        val col = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        micTitle = TextView(this).apply { setTextColor(0xFFEFEDE8.toInt()); textSize = 15f; typeface = Typeface.DEFAULT_BOLD; text = "Phone microphone" }
+        micDetail = TextView(this).apply { setTextColor(0xFFC9C7C2.toInt()); textSize = 13f; text = "No fob? Hold the button and speak." }
+        col.addView(micTitle); col.addView(micDetail)
+        row.addView(col, LinearLayout.LayoutParams(0, -2, 1f))
+        micBtn = Button(this).apply {
+            isAllCaps = false; textSize = 14f; text = "Hold to talk"; setTextColor(0xFFEFEDE8.toInt())
+            background = GradientDrawable().apply { cornerRadius = dp(12).toFloat(); setColor(0xFF1C1C1F.toInt()); setStroke(dp(1), 0x44EFEDE8) }
+            setPadding(dp(16), 0, dp(16), 0); minHeight = dp(44); minimumHeight = dp(44)
+        }
+        mic = PhoneMic(this) { busy, title, detail ->
+            micTitle.text = title; micDetail.text = detail
+            micBtn.isEnabled = !mic.busy
+            (micBtn.background as GradientDrawable).setColor(if (busy && title == "Listening…") 0xFFE5322B.toInt() else 0xFF1C1C1F.toInt())
+            if (!busy && title == "Saved") voice.reload()
+        }
+        @SuppressLint("ClickableViewAccessibility")
+        micBtn.setOnTouchListener { v, e ->
+            when (e.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    if (!has(Manifest.permission.RECORD_AUDIO)) {
+                        afterPerms = { if (has(Manifest.permission.RECORD_AUDIO)) { micTitle.text = "Ready"; micDetail.text = "Now hold the button and speak." } }
+                        permLauncher.launch(arrayOf(Manifest.permission.RECORD_AUDIO))
+                    } else { v.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY); mic.start() }
+                    true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> { mic.stop(); if (e.actionMasked == MotionEvent.ACTION_UP) v.performClick(); true }
+                else -> true
+            }
+        }
+        row.addView(micBtn, LinearLayout.LayoutParams(-2, dp(44)).apply { leftMargin = dp(10) })
         return row
     }
 
@@ -380,6 +468,8 @@ class MainActivity : ComponentActivity() {
                 return true
             }
             override fun onPageFinished(v: WebView, url: String) {
+                swipes[v]?.isRefreshing = false
+                if (url.startsWith(SITE)) v.evaluateJavascript(siteJs, null)
                 if (v === voice) v.evaluateJavascript(
                     "(function(){var f=document.getElementById('fob');if(f)f.style.display='none';" +
                         "var a=document.querySelector('header a[href=\"/\"]');if(a)a.parentNode.style.display='none';})()", null)
@@ -406,6 +496,11 @@ class MainActivity : ComponentActivity() {
                     openExternal(r.url.toString()); return true
                 }
                 override fun onRenderProcessGone(v: WebView, d: RenderProcessGoneDetail): Boolean { recreate(); return true }
+                override fun onPageFinished(v: WebView, url: String) {
+                    v.evaluateJavascript("(function(){if(window.__ttTop)return;window.__ttTop=1;var P=window.ConductorPage;" +
+                        "function r(){try{P&&P.top((window.scrollY||0)<=0&&!document.querySelector('.sheet.on'));}catch(e){}}" +
+                        "addEventListener('scroll',r,{passive:true});addEventListener('touchstart',r,{passive:true,capture:true});})()", null)
+                }
             }
         }
     }

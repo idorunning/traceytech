@@ -192,14 +192,26 @@ async function applySuggestion(env,id){
   return gone();
 }
 
+/* A to-do that only names a list ("Shopping list", "shopping") is not a task: it made other screens
+   say "Shopping 2" when the list was empty. Set such items aside (state 'ignored', so nothing is lost). */
+async function clearPlaceholders(env){
+  const snap=await snapshot(env),norm=x=>String(x||'').toLowerCase().replace(/[^a-z0-9 ]+/g,' ').replace(/\s+/g,' ').trim();
+  const names=new Set();for(const l of snap.lists){const n=norm(l.name);names.add(n);names.add(n+' list');names.add('my '+n+' list');names.add('the '+n+' list');}
+  ['list','lists','to do','todo','to do list','todo list','shopping','shopping list','groceries','grocery list'].forEach(x=>names.add(x));
+  const ids=snap.todos.filter(t=>t.state==='open'&&names.has(norm(t.text))).map(t=>t.id);
+  if(ids.length){const now=new Date().toISOString();await env.DB.batch(ids.map(id=>env.DB.prepare("UPDATE todos SET state='ignored',updated=? WHERE id=?").bind(now,id)));}
+  return ids;
+}
+
 async function listRoutes(r,env,u){
   if(u.pathname!=='/api/lists')return null;
   await listTables(env);
   const db=env.DB;
   if(r.method==='GET'){
-    const snap=await snapshot(env);
+    let snap=await snapshot(env);
     const sug=((await db.prepare("SELECT id,kind,payload,reason,created FROM todo_agent WHERE state='pending' ORDER BY id DESC LIMIT 40").all()).results||[])
       .map(x=>({id:x.id,kind:x.kind,reason:x.reason,created:x.created,...jparse(x.payload,{})}));
+    if(await clearPlaceholders(env).then(x=>x.length))snap=await snapshot(env);
     return json({lists:snap.lists,todos:snap.todos.map(({created,by,...t})=>t),suggestions:sug,
       agent:{lastReview:await meta(env,'last_review'),engine:await meta(env,'engine'),auto:(await meta(env,'auto'))==='1',ai:!!(env.ANTHROPIC_API_KEY||env.AI)}});
   }
@@ -214,6 +226,7 @@ async function listRoutes(r,env,u){
   const getTodo=async id=>Number.isInteger(id)?await db.prepare('SELECT t.id,m.list_id,m.fields FROM todos t LEFT JOIN todo_list_items m ON m.todo_id=t.id WHERE t.id=?').bind(id).first():null;
 
   if(op==='agent'){ // file new to-dos every time; review at most every 6 hours unless forced
+    await clearPlaceholders(env);
     if(!env.ANTHROPIC_API_KEY&&!env.AI)return json({error:'No AI is set up on the Worker.'},503);
     const busy=await meta(env,'busy');if(busy&&Date.now()-Number(busy)<90000)return json({ok:true,busy:true});
     await setMeta(env,'busy',Date.now());
