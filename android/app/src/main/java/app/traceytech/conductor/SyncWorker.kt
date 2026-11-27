@@ -23,13 +23,20 @@ class SyncWorker(c: Context, p: WorkerParameters) : CoroutineWorker(c, p) {
         val alarms = mutableListOf<Alarms.Alarm>()
         var problems = 0
 
+        // The lists agent files new to-dos and (every few hours) reviews the lists. Skipped quietly when the server has no lists route.
+        if (p.getBoolean("lists_server", true)) {
+            val ag = Net.postJson("/api/lists", JSONObject().put("op", "agent"))
+            if (ag.code == 404) p.edit().putBoolean("lists_server", false).apply()
+        }
         // To-dos (with lists when the server has them)
         val lists = Net.get("/api/lists")
+        if (lists.ok) p.edit().putBoolean("lists_server", true).apply()
         val todos: JSONArray
         if (lists.signedOut) { Notifier.signIn(c); note(c, "Signed out"); return Result.success() }
         if (lists.ok) {
             Cache.put(c, "lists", lists.body)
             todos = lists.json().optJSONArray("todos") ?: JSONArray()
+            suggestions(c, lists.json().optJSONArray("suggestions") ?: JSONArray())
         } else {
             val t = Net.get("/api/todos")
             if (t.signedOut) { Notifier.signIn(c); note(c, "Signed out"); return Result.success() }
@@ -113,6 +120,24 @@ class SyncWorker(c: Context, p: WorkerParameters) : CoroutineWorker(c, p) {
         Alarms.replaceAll(c, alarms)
         note(c, if (problems == 0) "Up to date" else "Partly updated ($problems source${if (problems > 1) "s" else ""} failed)")
         return Result.success()
+    }
+
+    /** One notification when the lists agent has new ideas waiting (never the same ones twice). */
+    private fun suggestions(c: Context, a: JSONArray) {
+        val p = Prefs.of(c)
+        val seen = p.getLong("sug_seen", 0)
+        var top = seen; var fresh = 0; var first = ""
+        for (i in 0 until a.length()) {
+            val s = a.optJSONObject(i) ?: continue
+            val id = s.optLong("id")
+            if (id > seen) { fresh++; if (first.isEmpty()) first = s.optString("reason"); if (id > top) top = id }
+        }
+        if (top > seen) p.edit().putLong("sug_seen", top).apply()
+        if (fresh == 0) return
+        if (!p.getBoolean(Prefs.N_REMIND, true)) return
+        Notifier.post(c, 9100, Notif.CH_REMIND,
+            if (fresh == 1) "Lists agent: 1 suggestion" else "Lists agent: $fresh suggestions",
+            first.ifEmpty { "Tap to review how your lists could be tidied." }, MainActivity.TAB_LISTS + "#agent")
     }
 
     private fun note(c: Context, msg: String) {

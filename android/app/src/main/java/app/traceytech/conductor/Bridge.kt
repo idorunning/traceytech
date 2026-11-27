@@ -117,6 +117,27 @@ class Bridge(private val a: MainActivity) {
 
     @JavascriptInterface fun openUrl(url: String) { if (url.startsWith("https://")) main.post { a.openExternal(url) } }
 
+    /** Saves an exported list (CSV or Markdown) and opens the share sheet: Drive, Gmail, Sheets, Files… */
+    @JavascriptInterface
+    fun share(name: String, mime: String, text: String) {
+        val safe = name.replace(Regex("[^A-Za-z0-9 ._-]"), "").trim().take(60).ifEmpty { "list.txt" }
+        val type = if (mime == "text/csv" || mime == "text/markdown") mime else "text/plain"
+        main.post {
+            try {
+                val dir = java.io.File(a.cacheDir, "exports").apply { mkdirs(); listFiles()?.forEach { it.delete() } }
+                val f = java.io.File(dir, safe).apply { writeText(text) }
+                val uri = androidx.core.content.FileProvider.getUriForFile(a, a.packageName + ".files", f)
+                val send = android.content.Intent(android.content.Intent.ACTION_SEND).setType(type)
+                    .putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                    .putExtra(android.content.Intent.EXTRA_SUBJECT, safe)
+                    .addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                a.startActivity(android.content.Intent.createChooser(send, "Share $safe"))
+            } catch (e: Exception) {
+                a.localViews().forEach { it.evaluateJavascript("window.toast&&toast('Could not share the list')", null) }
+            }
+        }
+    }
+
     @JavascriptInterface
     fun haptic() = main.post { a.window.decorView.performHapticFeedback(android.view.HapticFeedbackConstants.CONFIRM) }.let {}
 }

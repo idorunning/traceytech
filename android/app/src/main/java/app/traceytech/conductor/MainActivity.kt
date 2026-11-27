@@ -222,7 +222,9 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    fun show(key: String) {
+    fun show(target: String) {
+        val agent = target.endsWith("#agent")          // a lists-agent notification opens the suggestions
+        val key = target.removeSuffix("#agent")
         val k = if (tabs.containsKey(key)) key else TAB_HOME
         tab = k
         tabs.forEach { (name, pair) ->
@@ -236,8 +238,8 @@ class MainActivity : ComponentActivity() {
         }
         val w = current() ?: return
         val first = loaded.add(k)
-        if (first) w.loadUrl(w.tag as String)
-        else w.evaluateJavascript("window.onNativeShow&&onNativeShow()", null)
+        if (first) w.loadUrl((w.tag as String) + if (agent) "#agent" else "")
+        else w.evaluateJavascript(if (agent) "window.onNativeOpenAgent&&onNativeOpenAgent()" else "window.onNativeShow&&onNativeShow()", null)
     }
 
     private fun current(): WebView? = when (tab) {
