@@ -37,6 +37,7 @@ object Prefs {
     const val LAST_SYNC = "last_sync"
     const val LAST_SYNC_MSG = "last_sync_msg"
     const val ONBOARDED = "onboarded"
+    const val LENSES = "lenses"            // Conductor home: lens order and which are switched off
     fun of(c: Context): SharedPreferences = c.getSharedPreferences("conductor", Context.MODE_PRIVATE)
 }
 

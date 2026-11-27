@@ -43,6 +43,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import androidx.webkit.WebViewAssetLoader
+import org.json.JSONObject
 
 class MainActivity : ComponentActivity() {
 
@@ -58,7 +59,13 @@ class MainActivity : ComponentActivity() {
 
     private lateinit var content: FrameLayout
     private lateinit var nav: LinearLayout
-    private lateinit var home: WebView
+    private lateinit var home: WebView          // traceytech.app itself: sign-in, and "Open TraceyTech site"
+    private lateinit var cond: WebView          // the Conductor home, built into the app
+    private lateinit var homeBox: FrameLayout
+    private lateinit var homeSite: View
+    private lateinit var homeCond: View
+    private var siteOpen = false                // the person chose to look at the website from the Conductor home
+    private var condMic: PhoneMic? = null
     private lateinit var voice: WebView
     private lateinit var lists: WebView
     private lateinit var settings: WebView
@@ -113,6 +120,7 @@ class MainActivity : ComponentActivity() {
                 val w = current()
                 when {
                     w != null && w.canGoBack() -> w.goBack()
+                    w === home && siteOpen && Net.signedIn() -> closeSite()
                     tab != TAB_HOME -> show(TAB_HOME)
                     else -> moveTaskToBack(true)
                 }
@@ -145,6 +153,7 @@ class MainActivity : ComponentActivity() {
         super.onPause()
         pausedAt = System.currentTimeMillis()
         if (::mic.isInitialized) mic.stop()
+        condMic?.stop()
         FobService.listener = null
         CookieManager.getInstance().flush()
     }
@@ -173,6 +182,7 @@ class MainActivity : ComponentActivity() {
 
         home = site(SITE + "/")
         voice = site(SITE + "/voice")
+        cond = local("home.html")
         lists = local("lists.html")
         settings = local("settings.html")
 
@@ -180,7 +190,11 @@ class MainActivity : ComponentActivity() {
         voiceBox.addView(fobStrip(), LinearLayout.LayoutParams(-1, -2))
         voiceBox.addView(micPanel(), LinearLayout.LayoutParams(-1, -2))
         voiceBox.addView(pull(voice), LinearLayout.LayoutParams(-1, 0, 1f))
-        val homeBox = pull(home); val listsBox = pull(lists); val settingsBox = pull(settings)
+        homeSite = pull(home); homeCond = pull(cond)
+        homeBox = FrameLayout(this).apply {
+            addView(homeCond, FrameLayout.LayoutParams(-1, -1)); addView(homeSite, FrameLayout.LayoutParams(-1, -1))
+        }
+        val listsBox = pull(lists); val settingsBox = pull(settings)
 
         listOf(homeBox, listsBox, voiceBox, settingsBox).forEach { content.addView(it, FrameLayout.LayoutParams(-1, -1)); it.visibility = View.GONE }
 
@@ -248,6 +262,7 @@ class MainActivity : ComponentActivity() {
     private fun refresh(w: WebView) {
         if (Net.signedIn()) Sync.now(this)
         if (w === home || w === voice) w.reload()
+        else if (w === cond) { w.evaluateJavascript("window.onNativeReselect&&onNativeReselect()", null); w.postDelayed({ swipes[w]?.isRefreshing = false }, 1200) }
         else {
             w.evaluateJavascript("window.onNativeShow&&onNativeShow()", null)
             w.postDelayed({ swipes[w]?.isRefreshing = false }, 900)
@@ -255,14 +270,48 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun refreshAll() {
-        if (TAB_HOME in loaded) home.reload()
+        if ("site" in loaded) home.reload()
         if (TAB_VOICE in loaded) voice.reload()
         localViews().forEach { it.evaluateJavascript("window.onNativeShow&&onNativeShow()", null) }
     }
 
+    /** Home is the Conductor once signed in. Signed out (or asked for), it is the TraceyTech website. */
+    private fun homeMode() {
+        val site = siteOpen || !Net.signedIn()
+        homeSite.visibility = if (site) View.VISIBLE else View.GONE
+        homeCond.visibility = if (site) View.GONE else View.VISIBLE
+    }
+
+    /** From the Conductor home: "Fix in TraceyTech" or Settings, "Open TraceyTech site". */
+    fun openSite() {
+        siteOpen = true
+        if (!loaded.contains("site")) { loaded.add("site"); home.loadUrl(SITE + "/") }
+        show(TAB_HOME)
+    }
+
+    private fun closeSite() { siteOpen = false; show(TAB_HOME) }
+
+    /** The Conductor chat bar's microphone. Nothing is saved: the words come back as a question. */
+    fun conductorMic(start: Boolean) {
+        val m = condMic ?: PhoneMic(this, "/api/conductor/audio", { j ->
+            cond.evaluateJavascript("window.onMicText&&onMicText(" + JSONObject.quote(j.optString("text")) + ")", null)
+        }) { busy, title, detail ->
+            val st = when { title == "Listening…" -> "listening"; title == "Thinking…" -> "thinking"; busy -> "busy"; title == "Done" -> "idle"; else -> "error" }
+            cond.evaluateJavascript("window.onMicState&&onMicState(" + JSONObject.quote(st) + "," + JSONObject.quote(if (st == "idle") "" else "$title $detail".trim()) + ")", null)
+        }.also { condMic = it }
+        if (!start) { m.stop(); return }
+        if (!has(Manifest.permission.RECORD_AUDIO)) {
+            afterPerms = { if (has(Manifest.permission.RECORD_AUDIO)) cond.evaluateJavascript("window.onMicState&&onMicState('error','Microphone ready. Hold the mic and speak.')", null) }
+            permLauncher.launch(arrayOf(Manifest.permission.RECORD_AUDIO))
+            return
+        }
+        window.decorView.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+        m.start()
+    }
+
     private fun reselect() {
         when (tab) {
-            TAB_HOME -> { home.scrollTo(0, 0); home.reload() }
+            TAB_HOME -> if (current() === home) { home.scrollTo(0, 0); home.reload() } else cond.evaluateJavascript("window.onNativeReselect&&onNativeReselect()", null)
             TAB_VOICE -> voice.reload()
             else -> current()?.evaluateJavascript("window.onNativeReselect&&onNativeReselect()", null)
         }
@@ -282,14 +331,15 @@ class MainActivity : ComponentActivity() {
             ic.setColorFilter(col); t.setTextColor(col)
             t.typeface = if (on) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
         }
+        if (k == TAB_HOME) homeMode()
         val w = current() ?: return
-        val first = loaded.add(k)
+        val first = loaded.add(if (w === home) "site" else k)
         if (first) w.loadUrl((w.tag as String) + if (agent) "#agent" else "")
         else w.evaluateJavascript(if (agent) "window.onNativeOpenAgent&&onNativeOpenAgent()" else "window.onNativeShow&&onNativeShow()", null)
     }
 
     private fun current(): WebView? = when (tab) {
-        TAB_HOME -> home; TAB_LISTS -> lists; TAB_VOICE -> voice; TAB_SETTINGS -> settings; else -> null
+        TAB_HOME -> if (homeSite.visibility == View.VISIBLE) home else cond; TAB_LISTS -> lists; TAB_VOICE -> voice; TAB_SETTINGS -> settings; else -> null
     }
 
     private fun fobStrip(): View {
@@ -403,8 +453,8 @@ class MainActivity : ComponentActivity() {
 
     fun signedOut() {
         CookieManager.getInstance().removeAllCookies { CookieManager.getInstance().flush() }
-        loaded.remove(TAB_HOME); loaded.remove(TAB_VOICE)
-        home.loadUrl("$SITE/login"); voice.clearHistory()
+        loaded.remove("site"); loaded.remove(TAB_VOICE); siteOpen = false
+        home.loadUrl("$SITE/login"); loaded.add("site"); voice.clearHistory()
         show(TAB_HOME)
     }
 
@@ -475,7 +525,12 @@ class MainActivity : ComponentActivity() {
                         "var a=document.querySelector('header a[href=\"/\"]');if(a)a.parentNode.style.display='none';})()", null)
                 if (url.startsWith("$SITE/") && !url.startsWith("$SITE/login")) {
                     CookieManager.getInstance().flush()
-                    if (Net.signedIn()) bridge.changed()
+                    if (Net.signedIn()) {
+                        bridge.changed()
+                        if (v === home && !siteOpen && tab == TAB_HOME && homeSite.visibility == View.VISIBLE) {
+                            homeMode(); if (loaded.add(TAB_HOME)) cond.loadUrl(cond.tag as String) else cond.evaluateJavascript("window.onNativeShow&&onNativeShow()", null)
+                        }
+                    }
                 }
             }
             override fun onRenderProcessGone(v: WebView, d: RenderProcessGoneDetail): Boolean { recreate(); return true }
@@ -505,7 +560,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    fun localViews() = listOf(lists, settings)
+    fun localViews() = listOf(cond, lists, settings)
 
     private fun googleInChrome() {
         AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)

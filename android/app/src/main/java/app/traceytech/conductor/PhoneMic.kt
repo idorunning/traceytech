@@ -15,7 +15,12 @@ import java.util.concurrent.Executors
  * Hold to talk: 16 kHz mono 16-bit PCM, up to 60 seconds, sent to the same /api/voice/audio
  * the fob uses, so a note becomes a reminder, a to-do or a draft in exactly the same way.
  */
-class PhoneMic(private val c: Context, private val onState: (busy: Boolean, title: String, detail: String) -> Unit) {
+class PhoneMic(
+    private val c: Context,
+    private val path: String = "/api/voice/audio",
+    private val onResult: ((org.json.JSONObject) -> Unit)? = null,   // set for Conductor questions: nothing is saved, the text comes back
+    private val onState: (busy: Boolean, title: String, detail: String) -> Unit
+) {
     private val rate = 16000
     private val max = rate * 2 * 60
     private val main = Handler(Looper.getMainLooper())
@@ -57,14 +62,15 @@ class PhoneMic(private val c: Context, private val onState: (busy: Boolean, titl
     private fun send(pcm: ByteArray) {
         if (pcm.size < rate) { main.post { onState(false, "Too short", "Hold the button while you speak.") }; return }
         busy = true
-        main.post { onState(true, "Thinking…", "Turning your note into text.") }
-        val res = Net.call("POST", "/api/voice/audio", pcm, "application/octet-stream", mapOf("X-Sample-Rate" to rate.toString()), timeoutMs = 90000)
+        main.post { onState(true, "Thinking…", if (onResult != null) "Turning your words into text." else "Turning your note into text.") }
+        val res = Net.call("POST", path, pcm, "application/octet-stream", mapOf("X-Sample-Rate" to rate.toString()), timeoutMs = 90000)
         val j = res.json()
         busy = false
         main.post {
             when {
                 res.signedOut -> { onState(false, "Not saved", "Sign in to TraceyTech on the Home tab first."); Notifier.signIn(c) }
                 !res.ok -> onState(false, "Not saved", j.optString("error", "No connection. Try again."))
+                onResult != null -> { onState(false, "Done", ""); onResult.invoke(j) }
                 else -> {
                     val said = j.optString("transcript")
                     onState(false, if (j.optBoolean("ok")) "Saved" else "Not sure what to do",

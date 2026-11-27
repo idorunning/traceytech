@@ -10,7 +10,7 @@ import org.json.JSONObject
 import java.util.concurrent.Executors
 
 /**
- * window.Native in the app's own pages (Lists, Settings). Only those two local pages get it;
+ * window.Native in the app's own pages (Conductor home, Lists, Settings). Only those local pages get it;
  * traceytech.app pages never see it.
  */
 class Bridge(private val a: MainActivity) {
@@ -34,7 +34,11 @@ class Bridge(private val a: MainActivity) {
             if (r.ok && method == "GET") when (path) {
                 "/api/lists" -> Cache.put(a, "lists", r.body)
                 "/api/todos" -> Cache.put(a, "todos", r.body)
+                "/api/google/feed" -> Cache.put(a, "feed", r.body)
+                "/api/voice" -> Cache.put(a, "voice", r.body)
             }
+            if (r.ok && method == "POST" && path == "/api/conductor" && body?.contains("\"op\":\"brief\"") == true && r.body.contains("\"headline\""))
+                Cache.put(a, "brief", r.body)
             if (r.ok && method == "POST" && (path == "/api/lists" || path == "/api/todos")) main.post { Sync.now(a) }
             reply(id, r.code, r.body)
         }
@@ -44,6 +48,21 @@ class Bridge(private val a: MainActivity) {
         js("window.__native&&__native($id,$code,${JSONObject.quote(body)})")
 
     @JavascriptInterface fun cached(key: String): String = Cache.get(a, key) ?: ""
+
+    /** Which lenses are on, and their order, for the Conductor home: {"order":[...],"off":[...]} */
+    @JavascriptInterface fun lensPrefs(): String = Prefs.of(a).getString(Prefs.LENSES, "") ?: ""
+
+    @JavascriptInterface
+    fun setLensPrefs(json: String) {
+        val ok = try { JSONObject(json); json.length < 4000 } catch (e: Exception) { false }
+        if (!ok) return
+        Prefs.of(a).edit().putString(Prefs.LENSES, json).apply()
+        changed()
+    }
+
+    /** Hold-to-talk on the Conductor chat bar. Answers come back as onMicState(state, detail) and onMicText(text). */
+    @JavascriptInterface fun micStart() = main.post { a.conductorMic(true) }.let {}
+    @JavascriptInterface fun micStop() = main.post { a.conductorMic(false) }.let {}
 
     @JavascriptInterface
     fun state(): String {
@@ -105,7 +124,7 @@ class Bridge(private val a: MainActivity) {
 
     @JavascriptInterface fun syncNow() = Sync.now(a)
 
-    @JavascriptInterface fun open(tab: String) = main.post { a.show(tab) }.let {}
+    @JavascriptInterface fun open(tab: String) = main.post { if (tab == "site") a.openSite() else a.show(tab) }.let {}
 
     @JavascriptInterface
     fun signOut() {

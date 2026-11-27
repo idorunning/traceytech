@@ -23,8 +23,8 @@ android {
         applicationId = "app.traceytech.conductor"
         minSdk = 33
         targetSdk = 36
-        versionCode = 102
-        versionName = "1.2.0"
+        versionCode = 103
+        versionName = "1.3.0"
     }
 
     signingConfigs {

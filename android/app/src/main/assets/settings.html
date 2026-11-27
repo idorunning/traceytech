@@ -40,12 +40,32 @@ const PERMS=[['notifications','Notifications','Reminders, calendar, voice notes 
   ['alarms','Alarms and reminders','Reminders arrive at the exact minute'],
   ['battery','Battery: Unrestricted','Keeps the fob connected and updates on time. Open, then Battery, then Unrestricted.'],
   ['location','Location','Nearby places and routes on the Home screen']];
+const LENS_INFO=[['schedule','Schedule','Your shift and what is next today and tomorrow. Meetings only, never to-dos.'],
+  ['replies','Replies','Invites waiting for yes, maybe or no.'],
+  ['lists','Lists','The top to-dos that are due or overdue. Empty lists stay hidden.'],
+  ['inbox','Inbox','Email from real people, not newsletters.'],
+  ['out','Out and about','Where your next event is, with directions.'],
+  ['voice','Voice notes','Recent notes from the fob or the phone, and anything waiting for your OK.'],
+  ['trips','Trips and plans','Countdowns to trips, and a warning when you are due to work.'],
+  ['conns','Connections','Only shows when something is broken, such as Google or the fob.']];
+let MEM=null,MEMERR='';
+function lensPrefs(){try{return JSON.parse(N.lensPrefs()||'{}');}catch(e){return {};}}
+async function loadMem(){const r=await api('GET','/api/conductor');if(r.ok){MEM=r.json.memory||[];MEMERR='';}else MEMERR=r.code===401?'Sign in to see what Conductor remembers.':(r.json.error||'Not available yet');render();}
 function sw(k,on){return `<label class="sw"><input type="checkbox" data-p="${k}"${on?' checked':''}><span></span></label>`;}
 function ago(t){if(!t)return 'Not yet';const m=Math.round((Date.now()-t)/6e4);if(m<1)return 'Just now';if(m<60)return m+' min ago';const h=Math.round(m/60);return h<24?h+' h ago':new Date(t).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});}
 function render(){
   if(!N){$('#main').innerHTML='<p class="muted">Open this inside Conductor IO.</p>';return;}
   const s=JSON.parse(N.state()),p=s.prefs,f=s.fob;
   $('#main').innerHTML=`
+  <section class="card"><h2>Lenses</h2>
+    <p class="muted" style="margin:0 16px 8px;font-size:14px">Each lens is a small agent that watches one thing. Conductor reads them all and tells you what matters first. Switch off any you don't need. On Home, press and hold a lens to move it.</p>
+    ${LENS_INFO.map(([k,t,d])=>`<div class="line"><div class="l">${t}<div class="s">${d}</div></div><label class="sw"><input type="checkbox" data-lens="${k}"${(lensPrefs().off||[]).includes(k)?'':' checked'}><span></span></label></div>`).join('')}
+  </section>
+  <section class="card"><h2>What Conductor remembers</h2>
+    <p class="muted" style="margin:0 16px 8px;font-size:14px">Things you told it to remember, and what it has learned about how you work. Tap Forget to remove one.</p>
+    ${MEM==null?`<p class="muted" style="margin:0 16px 12px">${esc(MEMERR||'Loading…')}</p>`:MEM.length?MEM.map(m=>`<div class="line"><div class="l">${esc(m.text)}<div class="s">${m.kind==='profile'?'Learned':'You told it'}</div></div><button class="pill" data-forget="${m.id}">Forget</button></div>`).join(''):'<p class="muted" style="margin:0 16px 12px">Nothing yet. In the chat bar on Home, say "remember that…".</p>'}
+    ${MEM&&MEM.length?'<div class="btns"><button class="pill danger" id="forgetAll">Forget everything</button></div>':''}
+  </section>
   <section class="card"><h2>Voice fob</h2>
     <div class="line"><span class="dot ${f.connected?'on':f.on?'busy':''}"></span><div class="l"><div>${esc(f.status)}</div><div class="s">${esc(f.detail)}</div></div></div>
     <div class="btns"><button class="pill solid" data-fob="toggle">${f.on?'Disconnect':'Connect fob'}</button>${f.known?'<button class="pill" data-fob="forget">Forget fob</button>':''}<button class="pill" data-fob="open">Voice notes</button></div>
@@ -70,21 +90,27 @@ function render(){
   <section class="card"><h2>Account</h2>
     <div class="line"><div class="l">TraceyTech<div class="s">${s.signedIn?'Signed in':'Not signed in. Sign in on the Home tab.'}</div></div>${s.signedIn?'<button class="pill danger" id="signOut">Sign out</button>':'<button class="pill" data-tab="home">Sign in</button>'}</div>
     <div class="line"><div class="l">Google<div class="s">Connect Google once in Chrome at traceytech.app. The app uses the same connection.</div></div><button class="pill" id="google">Open</button></div>
+    <div class="line"><div class="l">TraceyTech website<div class="s">The full site, inside the app. Press back to return to Conductor.</div></div><button class="pill" data-tab="site">Open site</button></div>
   </section>
   <p class="muted" style="text-align:center;font-size:12px">Conductor IO ${esc(s.version)} for TraceyTech</p>`;
 }
-document.addEventListener('change',e=>{const k=e.target.dataset.p;if(!k)return;N.setPref(k,e.target.type==='checkbox'?String(e.target.checked):e.target.value);haptic();});
+document.addEventListener('change',e=>{const L=e.target.dataset.lens;
+  if(L){const p=lensPrefs();const off=new Set(p.off||[]);if(e.target.checked)off.delete(L);else off.add(L);N.setLensPrefs(JSON.stringify({order:p.order||[],off:[...off]}));haptic();return;}
+  const k=e.target.dataset.p;if(!k)return;N.setPref(k,e.target.type==='checkbox'?String(e.target.checked):e.target.value);haptic();});
 document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
   if(b.dataset.perm)N.permission(b.dataset.perm);
   else if(b.dataset.fob)N.fob(b.dataset.fob);
   else if(b.dataset.tab)N.open(b.dataset.tab);
+  else if(b.dataset.forget){b.disabled=true;api('POST','/api/conductor',{op:'forget',id:+b.dataset.forget}).then(r=>{if(r.ok){MEM=MEM.filter(m=>m.id!==+b.dataset.forget);toast('Forgotten');}else toast(esc(r.json.error||'Could not forget'));render();});}
+  else if(b.id==='forgetAll'){const s=sheet('<h2>Forget everything?</h2><p class="muted">Conductor starts learning about you again from scratch.</p><div class="actions"><button class="pill" id="no">Cancel</button><button class="pill danger" id="yes">Forget everything</button></div>');
+    $('#no',s).onclick=closeSheet;$('#yes',s).onclick=async()=>{closeSheet();const r=await api('POST','/api/conductor',{op:'forget_all'});if(r.ok){MEM=[];toast('Conductor has forgotten everything');}render();};}
   else if(b.id==='syncNow'){N.syncNow();toast('Updating…');setTimeout(render,4000);}
   else if(b.id==='google')N.openUrl('https://traceytech.app/');
   else if(b.id==='signOut'){const s=sheet('<h2>Sign out of TraceyTech?</h2><p class="muted">Reminders and voice notes stop until you sign in again.</p><div class="actions"><button class="pill" id="no">Cancel</button><button class="pill danger" id="yes">Sign out</button></div>');
     $('#no',s).onclick=closeSheet;$('#yes',s).onclick=()=>{closeSheet();N.signOut();};}
 });
-window.onNativeChange=render;window.onNativeShow=render;window.onNativeReselect=render;
-render();setInterval(()=>{if(document.visibilityState==='visible'&&!document.querySelector('select:focus'))render();},5000);
+window.onNativeChange=render;window.onNativeShow=()=>{render();loadMem();};window.onNativeReselect=window.onNativeShow;
+render();loadMem();setInterval(()=>{if(document.visibilityState==='visible'&&!document.querySelector('select:focus'))render();},5000);
 </script>
 </body>
 </html>

@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Conductor</title>
+<link rel="stylesheet" href="common.css">
+<style>
+main{padding:0 14px calc(var(--dock,92px) + 36px)}
+header.top{padding-bottom:6px}
+.when{font:500 12px ui-monospace,Menlo,monospace;color:var(--ash);text-align:right;line-height:1.5}
+.lens{position:relative;margin:0 0 12px;padding:16px 16px 14px;transition:transform .18s,box-shadow .18s,opacity .18s;touch-action:pan-y}
+.lens.cond{background:linear-gradient(160deg,#25252acc,#141416cc);border-color:var(--line2)}
+.lh{display:flex;align-items:center;gap:8px;margin:0 0 10px;user-select:none;-webkit-user-select:none}
+.lh .k{font:500 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.16em;text-transform:uppercase;color:var(--ash);flex:1}
+.lh .dot{width:7px;height:7px;border-radius:50%;background:var(--ash)}
+.lh .grip{color:#8f8e8a88;font-size:15px;letter-spacing:-2px;padding:4px 2px}
+.lens.lift{z-index:30;transform:scale(1.02);box-shadow:0 18px 40px #000c;opacity:.96}
+.lens.ghost{opacity:.35}
+.headline{font-size:22px;line-height:1.25;font-weight:600;letter-spacing:-.02em;margin:0 0 6px}
+.sum{color:var(--mist);margin:0 0 12px}
+.step{display:flex;align-items:center;gap:12px;padding:11px 0;border-top:1px solid var(--line)}
+.step .n{flex:none;width:24px;height:24px;border-radius:8px;border:1px solid var(--line2);display:grid;place-items:center;font:600 12px ui-monospace,Menlo,monospace;color:var(--mist)}
+.step .t{flex:1;min-width:0}
+.idea{padding:11px 0;border-top:1px solid var(--line)}
+.idea .t{margin-bottom:8px}
+.sub{font-size:12px;color:var(--ash);margin-top:10px}
+.rowi{display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line)}
+.rowi:first-of-type{border-top:0}
+.rowi .tm{flex:none;width:52px;font:600 13px ui-monospace,Menlo,monospace;color:var(--mist);padding-top:2px}
+.rowi .b{flex:1;min-width:0}
+.rowi .s{font-size:13px;color:var(--ash)}
+.crit{color:#ff8a83}.okc{color:var(--ok)}.warnc{color:var(--warn)}
+.shift{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border:1px solid var(--line2);border-radius:12px;margin-bottom:8px}
+.shift b{font-size:16px}
+.week{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:12px}
+.day{border:1px solid var(--line);border-radius:10px;padding:7px 0 6px;text-align:center}
+.day .d{font:500 10px ui-monospace,Menlo,monospace;color:var(--ash);letter-spacing:.06em}
+.day .c{font:600 14px system-ui;margin-top:2px}
+.day .e{font-size:10.5px;color:var(--ash);height:14px}
+.day.L .c{color:#8ab4f8}.day.E .c{color:var(--warn)}.day.R .c{color:var(--ash)}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:8px;margin-top:10px}
+.grid2 .pill{width:100%}
+.tick{flex:none;width:24px;height:24px;border-radius:50%;border:1.6px solid var(--line2);margin-top:1px}
+.tick.done{background:var(--paper);border-color:var(--paper)}
+.big{font-size:34px;font-weight:600;letter-spacing:-.03em;line-height:1}
+.skel{height:14px;border-radius:7px;background:#ffffff0d;margin:8px 0}
+/* chat bar with its own clear space */
+#fade{position:fixed;left:0;right:0;bottom:0;height:calc(var(--dock,92px) + 48px);pointer-events:none;z-index:19;
+  background:linear-gradient(to bottom,rgba(9,9,10,0) 0,rgba(9,9,10,.94) 40px,#09090a 48px)}
+#dock{position:fixed;left:12px;right:12px;bottom:12px;z-index:20}
+#bar{display:flex;align-items:center;gap:8px;background:#161618;border:1px solid var(--line2);border-radius:18px;padding:6px 6px 6px 14px}
+#q{flex:1;min-width:0;background:none;border:0;outline:none;padding:10px 0;font-size:16px}
+.ib{flex:none;width:44px;height:44px;border-radius:12px;display:grid;place-items:center;border:1px solid var(--line2);background:#ffffff08}
+.ib.send{background:var(--paper);color:var(--void);border-color:var(--paper)}
+.ib.rec{background:var(--signal);border-color:var(--signal)}
+.ib svg{width:20px;height:20px}
+#micnote{font-size:12px;color:var(--ash);text-align:center;margin-top:6px;min-height:16px}
+/* chat sheet */
+.msgs{display:flex;flex-direction:column;gap:10px;margin-bottom:8px}
+.m{max-width:88%;padding:10px 12px;border-radius:14px;white-space:pre-wrap;word-wrap:break-word}
+.m.me{align-self:flex-end;background:var(--paper);color:var(--void)}
+.m.c{align-self:flex-start;background:#1f1f22;border:1px solid var(--line)}
+.m .acts{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.m .acts .pill{width:100%;white-space:normal;text-align:left;justify-content:flex-start;padding:10px 14px;line-height:1.3;height:auto}
+.draft{background:#0d0d0f;border:1px solid var(--line2);border-radius:12px;padding:10px 12px;white-space:pre-wrap;font-size:14px;margin-top:8px}
+.empty{color:var(--ash);font-size:14px;margin:4px 0}
+</style>
+</head>
+<body>
+<header class="top"><div><p class="eyebrow" id="eb">Conductor</p><h1 id="hi">Hello</h1></div><div class="when" id="when"></div></header>
+<main id="main"></main>
+<div id="fade"></div>
+<div id="dock"><form id="bar" autocomplete="off">
+  <input id="q" placeholder="Ask Conductor, or tell it what to do" enterkeyhint="send">
+  <button type="button" class="ib" id="mic" aria-label="Hold to talk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
+  <button type="submit" class="ib send" aria-label="Send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6"/></svg></button>
+</form><div id="micnote"></div></div>
+<script src="common.js"></script>
+<script>
+'use strict';
+/* ---------- the person's rota and plans (same as traceytech.app) ---------- */
+const DAY=864e5,at=(d,h,m=0)=>{const x=new Date(d);x.setHours(h,m,0,0);return x;};
+const ROTA_FROM=new Date(2026,10,1);
+const ROTA=('R,R,R,R,E0700-1600,E0700-1700,L1500-2400,L1500-2400,L1200-2100,E0900-1800,R,R,R,R,E0700-1600,E0700-1600,L1300-2400,L1500-2400,L1200-2100,E0900-1800,R,R,R,E0700-1500,E0700-1600,E0700-1600,L1500-2400,L1500-2400,L1200-2100,E0900-1800,'
+ +'R,R,R,R,E0700-1700,E0700-1600,L1300-2400,L1500-2400,L1200-2100,E0900-1800,R,R,R,R,E0700-1600,E0700-1600,L1300-2400,L1500-2400,L1200-2100,E0900-1800,R,R,R,R,E0700-1700,E0700-1700,L1500-2400,L1300-2400,L1200-2100,E0900-1800,R,'
+ +'R,R,R,E0700-1600,E0700-1600,L1300-2400,L1500-2400,L1200-2100,E0900-1800,R,R,R,R,E0700-1600,E0700-1700,L1500-2400,L1500-2400,L1200-2100,E0900-1800,R,R,R,R,E0700-1600,E0700-1600,L1300-2400,L1500-2400,L1200-2100,E0900-1800,R,R').split(',');
+const ROTA_END=new Date(+ROTA_FROM+ROTA.length*DAY);
+const CYC=['R','R','R','R','E0700-1600','E0700-1600','L1500-2400','L1500-2400','L1200-2100','E0900-1800'],CYC0=new Date(2027,1,3);
+const SH_NAME={E:'Early',L:'Late',R:'Rest day'};
+const LEAVE=[[new Date(2026,11,21),new Date(2027,0,3),'Annual leave'],[new Date(2027,6,17),new Date(2027,6,28),'Summer holiday']];
+const TRIPS=[{key:'krakow',title:'Kraków with your wife',start:new Date(2027,2,11),days:4,where:'Kraków'},
+  {key:'summer',title:'Summer holiday',start:new Date(2027,6,17),days:12},{key:'xmas',title:'Christmas',start:new Date(2026,11,25),days:1}];
+function shiftOn(d){const day=new Date(new Date(d).setHours(0,0,0,0));let code,proj=false;
+  const lv=LEAVE.find(l=>day>=l[0]&&day<=l[1]);if(lv)return {c:'R',name:lv[2],day,leave:true};
+  if(day>=ROTA_FROM&&day<ROTA_END)code=ROTA[Math.round((day-ROTA_FROM)/DAY)];
+  else{proj=true;const i=Math.round((day-CYC0)/DAY);code=CYC[((i%10)+10)%10];}
+  const c=code[0];if(c==='R')return {c,name:SH_NAME.R,day,proj};
+  const h=code.slice(1).split('-');return {c,name:SH_NAME[c],day,proj,start:at(day,+h[0].slice(0,2),+h[0].slice(2)),end:at(day,+h[1].slice(0,2),+h[1].slice(2))};}
+const hhmm=d=>new Date(d).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+const dayName=d=>new Date(d).toLocaleDateString('en-GB',{weekday:'short'});
+const shortDay=d=>new Date(d).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});
+const sameDay=(a,b)=>new Date(a).toDateString()===new Date(b).toDateString();
+const shiftTxt=s=>s.c==='R'?(s.leave?s.name:'Rest day'):`${s.name} ${hhmm(s.start)}–${hhmm(s.end===undefined?s.start:s.end).replace('00:00','24:00')}`;
+
+/* ---------- lenses ---------- */
+const LENSES={
+  schedule:{name:'Schedule',dot:'#8ab4f8'},replies:{name:'Replies',dot:'#ffa657'},lists:{name:'Lists',dot:'#3fb950'},
+  inbox:{name:'Inbox',dot:'#bc8cff'},out:{name:'Out and about',dot:'#58a6ff'},voice:{name:'Voice notes',dot:'#ff7eb6'},
+  trips:{name:'Trips and plans',dot:'#e3b341'},conns:{name:'Connections',dot:'#e5322b'}};
+const DEFAULT_ORDER=Object.keys(LENSES);
+const D={feed:null,feedErr:'',lists:null,voice:null,brief:null,briefBusy:false,chat:[],hidden:new Set()};
+function prefs(){let p={};try{p=JSON.parse((N&&N.lensPrefs&&N.lensPrefs())||'{}');}catch(e){}
+  const order=(p.order||[]).filter(k=>LENSES[k]);DEFAULT_ORDER.forEach(k=>{if(!order.includes(k))order.push(k);});
+  return {order,off:new Set(p.off||[])};}
+function savePrefs(order){const p=prefs();try{N.setLensPrefs(JSON.stringify({order,off:[...p.off]}));}catch(e){}}
+function learn(lens,action){api('POST','/api/conductor',{op:'event',lens,action});}
+
+function events(){const seen=new Set();return ((D.feed&&D.feed.events)||[]).filter(e=>{const k=e.title+'|'+e.start;if(seen.has(k)||e.rsvp==='declined')return false;seen.add(k);return true;})
+  .map(e=>({...e,s:e.start?new Date(e.start):null,e2:e.end?new Date(e.end):null})).filter(e=>e.s);}
+function clashWith(e){if(e.allDay)return null;const s=shiftOn(e.s);if(s.c==='R')return null;const end=e.e2||new Date(+e.s+36e5);return (e.s<s.end&&end>s.start)?s:null;}
+
+const R={};
+R.schedule=()=>{const now=new Date(),s=shiftOn(now),ev=events();
+  const today=ev.filter(e=>sameDay(e.s,now)&&(e.e2||e.s)>=now-0);
+  let h=`<div class="shift"><div><div class="s muted" style="font-size:12px">Today</div><b>${esc(shiftTxt(s))}</b></div>${s.c!=='R'&&now<s.start?`<span class="muted">in ${esc(until(s.start))}</span>`:s.c!=='R'&&now<s.end?'<span class="okc">On now</span>':''}</div>`;
+  h+=today.length?today.map(e=>{const c=clashWith(e);return `<div class="rowi"><div class="tm">${e.allDay?'Day':esc(hhmm(e.s))}</div><div class="b"><div>${esc(e.title)}</div>${e.where?`<div class="s">${esc(e.where)}</div>`:''}${c?`<div class="s crit">During your ${esc(c.name.toLowerCase())} shift</div>`:''}</div></div>`;}).join('')
+    :'<p class="empty">Nothing else in the calendar today.</p>';
+  let w='<div class="week">';for(let i=1;i<=7;i++){const d=new Date(+now+i*DAY),sh=shiftOn(d),n=ev.filter(e=>sameDay(e.s,d)).length;
+    w+=`<div class="day ${sh.c}"><div class="d">${esc(dayName(d).toUpperCase())}</div><div class="c">${sh.leave?'AL':sh.c==='R'?'–':sh.c}</div><div class="e">${n?n+' ev':''}</div></div>`;}
+  return h+w+'</div>';};
+R.replies=()=>{const inv=(D.feed&&D.feed.invites)||[];if(!inv.length)return null;
+  return inv.slice(0,4).map(e=>`<div class="rowi" data-inv="${esc(e.id)}"><div class="b"><div>${esc(e.title)}</div><div class="s">${esc(e.allDay?shortDay(e.start):shortDay(e.start)+' '+hhmm(e.start))}${e.org?' · from '+esc(e.org):''}</div>
+    <div class="grid2"><button class="pill solid" data-rsvp="accepted">Accept</button><button class="pill" data-rsvp="tentative">Maybe</button><button class="pill" data-rsvp="declined">Decline</button></div></div></div>`).join('');};
+R.lists=()=>{const L=D.lists;if(!L||!L.lists)return null;const open=(L.todos||[]).filter(t=>t.state==='open');
+  const withItems=L.lists.map(l=>({l,items:open.filter(t=>t.list===l.id)})).filter(x=>x.items.length);if(!withItems.length)return null;
+  const rank=t=>{const d=t.due?Date.parse(t.due.length===10?t.due+'T23:59':t.due):NaN;return isNaN(d)?9e15:d;};
+  const top=open.slice().sort((a,b)=>rank(a)-rank(b)).slice(0,4);const nm=new Map(L.lists.map(l=>[l.id,l.name]));
+  return `<div class="wrap" style="margin-bottom:6px">${withItems.map(x=>`<span class="pill" data-openlist="${x.l.id}" style="min-height:36px;font-size:14px">${esc(x.l.name)} <span class="muted" style="margin-left:6px">${x.items.length}</span></span>`).join('')}</div>`+
+    top.map(t=>{const d=rank(t),late=d<Date.now();return `<div class="rowi" data-todo="${t.id}"><button class="tick" data-tick="${t.id}" aria-label="Done"></button><div class="b"><div>${esc(t.text)}</div><div class="s">${esc(nm.get(t.list)||'')}${t.due?` · <span class="${late?'crit':''}">${esc(dueTxt(t.due))}</span>`:''}</div></div></div>`;}).join('');};
+R.inbox=()=>{const m=((D.feed&&D.feed.emails)||[]).filter(x=>!x.bulk);if(!m.length)return null;
+  return m.slice(0,5).map(x=>`<div class="rowi" data-mail="${esc(x.thread||x.id)}" data-acct="${esc(x.acct||'')}"><div class="b"><div>${esc(x.subject||'(no subject)')}</div><div class="s">${esc(String(x.from||'').replace(/<.*>/,'').trim())} · ${esc(x.snippet||'').slice(0,90)}</div></div></div>`).join('');};
+R.out=()=>{const now=Date.now(),ev=events().filter(e=>e.where&&!/meet\.google|zoom|teams/i.test(e.where)&&+e.s>now-36e5&&+e.s<now+36*36e5);
+  const er=D.lists&&D.lists.lists?(()=>{const l=D.lists.lists.find(x=>x.cat==='town'||x.name==='Errands');return l?(D.lists.todos||[]).filter(t=>t.list===l.id&&t.state==='open'):[];})():[];
+  if(!ev.length&&!er.length)return null;
+  let h=ev.slice(0,2).map(e=>`<div class="rowi"><div class="tm">${esc(hhmm(e.s))}</div><div class="b"><div>${esc(e.title)}</div><div class="s">${esc(e.where)}${sameDay(e.s,now)?'':' · '+esc(shortDay(e.s))}</div>
+    <div class="grid2"><button class="pill" data-dir="${esc(e.where)}">Directions</button></div></div></div>`).join('');
+  if(er.length)h+=`<div class="rowi"><div class="b"><div>${er.length} errand${er.length>1?'s':''} to do while you're out</div><div class="s">${esc(er.slice(0,3).map(t=>t.text).join(' · '))}</div></div></div>`;
+  return h;};
+R.voice=()=>{const rows=((D.voice&&D.voice.rows)||[]).filter(n=>n.state==='pending'||Date.now()-Date.parse(n.created)<864e5);if(!rows.length)return null;
+  return rows.slice(0,4).map(n=>`<div class="rowi" data-vn="${n.id}"><div class="b"><div>${esc(n.summary||n.title||n.transcript||'Voice note')}</div><div class="s">${esc(hhmm(n.created))}${n.state==='pending'?' · <span class="warnc">waiting for your OK</span>':''}</div>
+    ${n.state==='pending'?`<div class="grid2">${n.intent==='calendar'?'<button class="pill solid" data-va="calendar">Add to calendar</button>':n.intent==='email'?'<button class="pill solid" data-va="email">Send email</button>':''}<button class="pill" data-va="todo">Make a to-do</button><button class="pill" data-va="dismiss">Dismiss</button></div>`:''}</div></div>`).join('');};
+R.trips=()=>{const now=new Date(),up=TRIPS.filter(t=>+t.start+t.days*DAY>now&&+t.start-now<200*DAY);if(!up.length)return null;
+  return up.map(t=>{const d=Math.ceil((t.start-now)/DAY);let warn='';
+    if(t.key==='krakow'){const w=[];for(let i=0;i<t.days;i++){const s=shiftOn(+t.start+i*DAY);if(s.c!=='R')w.push(s);}
+      warn=w.length?`<div class="s crit">You're due to work ${w.length} of the ${t.days} days. Request leave.</div>`:'<div class="s okc">Leave is sorted.</div>';}
+    return `<div class="rowi"><div class="tm big" style="width:64px;font-size:26px">${d<=0?'Now':d}</div><div class="b"><div>${esc(t.title)}</div><div class="s">${esc(shortDay(t.start))}${d>0?' · '+d+' days':''}</div>${warn}</div></div>`;}).join('');};
+R.conns=()=>{const p=[];if(D.feedErr)p.push(['Google',D.feedErr]);if(D.feed&&D.feed.errors)Object.entries(D.feed.errors).slice(0,2).forEach(([k,v])=>p.push([k,v]));
+  try{const s=JSON.parse(N.state());if(!s.signedIn)p.push(['TraceyTech','Not signed in']);if(s.fob&&s.fob.on&&!s.fob.connected)p.push(['Voice fob',s.fob.status]);}catch(e){}
+  if(!p.length)return null;
+  return p.map(([a,b])=>`<div class="rowi"><div class="b"><div>${esc(a)}</div><div class="s crit">${esc(String(b).slice(0,140))}</div></div></div>`).join('')+'<div class="grid2"><button class="pill" data-web="1">Fix in TraceyTech</button></div>';};
+
+function until(t){const m=Math.round((t-Date.now())/6e4);return m<60?m+' min':Math.floor(m/60)+' h '+(m%60?m%60+' min':'');}
+function dueTxt(d){const t=new Date(d.length===10?d+'T00:00':d);if(isNaN(t))return d;const today=new Date();
+  const dd=Math.round((new Date(t).setHours(0,0,0,0)-new Date(today).setHours(0,0,0,0))/DAY);
+  const tm=d.length>10?' '+hhmm(t):'';return (dd<0?'Overdue':dd===0?'Today':dd===1?'Tomorrow':shortDay(t))+tm;}
+
+function condHtml(){const b=D.brief;
+  if(!b)return `<div class="skel" style="width:80%;height:22px"></div><div class="skel"></div><div class="skel" style="width:60%"></div>`;
+  let h=`<p class="headline">${esc(b.headline)}</p>${b.summary?`<p class="sum">${esc(b.summary)}</p>`:''}`;
+  h+=(b.steps||[]).map((s,i)=>`<div class="step"><span class="n">${i+1}</span><div class="t">${esc(s.text)}</div>${s.lens&&s.lens!=='none'&&LENSES[s.lens]?`<button class="pill" style="min-height:38px;font-size:14px" data-go="${esc(s.lens)}">Open</button>`:''}</div>`).join('');
+  h+=(b.ideas||[]).map((x,i)=>`<div class="idea"><div class="t">✦ ${esc(x.text)}</div>${x.draft?`<div class="draft">${esc(x.draft)}</div>`:''}<div class="grid2">${x.draft?`<button class="pill" data-share="${i}">Share draft</button>`:''}<button class="pill" data-idea-ok="${i}">Useful</button><button class="pill" data-idea-no="${i}">Not now</button></div></div>`).join('');
+  h+=`<div class="sub">${D.briefBusy?'Thinking…':'Updated '+esc(b.at?hhmm(b.at):'')+(b.engine==='claude'?' · Claude':b.engine?' · Cloudflare AI':'')+(b.stale?' · last good brief':'')}</div>`;
+  return h;}
+
+function render(){const p=prefs();const main=$('#main');
+  let h=`<section class="lens card cond" data-k="conductor"><div class="lh"><span class="dot" style="background:var(--paper)"></span><span class="k">Conductor</span></div><div class="lb">${condHtml()}</div></section>`;
+  for(const k of p.order){if(p.off.has(k))continue;const body=R[k]();if(body==null)continue;
+    h+=`<section class="lens card" data-k="${k}"><div class="lh"><span class="dot" style="background:${LENSES[k].dot}"></span><span class="k">${esc(LENSES[k].name)}</span><span class="grip" aria-hidden="true">⋮⋮</span></div><div class="lb">${body}</div></section>`;}
+  main.innerHTML=h;
+  const now=new Date();$('#hi').textContent=now.getHours()<12?'Good morning':now.getHours()<18?'Good afternoon':'Good evening';
+  $('#eb').textContent='Conductor · '+now.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'});
+  $('#when').textContent=hhmm(now);}
+
+/* ---------- data ---------- */
+function cached(k){try{const v=N&&N.cached(k);return v?JSON.parse(v):null;}catch(e){return null;}}
+function context(){const now=new Date(),sh=[];for(let i=0;i<3;i++){const d=new Date(+now+i*DAY),s=shiftOn(d);sh.push((i===0?'Today':shortDay(d))+': '+shiftTxt(s)+(s.proj?' (projected)':''));}
+  const trips=TRIPS.filter(t=>+t.start>now).map(t=>{let x=t.title+' from '+shortDay(t.start)+' for '+t.days+' days';if(t.key==='krakow'){let w=0;for(let i=0;i<t.days;i++)if(shiftOn(+t.start+i*DAY).c!=='R')w++;x+=w?`; due to work ${w} of those days, leave not booked`:'; leave sorted';}return x;});
+  const p=prefs();return {shifts:sh,trips,lenses:p.order.filter(k=>!p.off.has(k))};}
+let loading=false;
+async function load(fresh){if(loading)return;loading=true;
+  const [f,l,v,c]=await Promise.all([api('GET','/api/google/feed'),api('GET','/api/lists'),api('GET','/api/voice'),api('GET','/api/conductor')]);
+  if(f.ok){D.feed=f.json;D.feedErr='';}else if(f.code&&f.code!==401)D.feedErr=f.json.error||'Google is not answering';
+  if(l.ok)D.lists=l.json;if(v.ok)D.voice=v.json;if(c.ok&&c.json.brief&&!D.brief)D.brief=c.json.brief;
+  render();loading=false;brief(fresh);}
+async function brief(fresh){if(D.briefBusy)return;D.briefBusy=true;const lb=$('[data-k="conductor"] .lb');if(lb)lb.innerHTML=condHtml();
+  const r=await api('POST','/api/conductor',{op:'brief',fresh:!!fresh,context:context()});D.briefBusy=false;
+  if(r.ok&&r.json.headline)D.brief=r.json;const lb2=$('[data-k="conductor"] .lb');if(lb2)lb2.innerHTML=condHtml();}
+
+/* ---------- taps ---------- */
+document.addEventListener('click',async e=>{const b=e.target.closest('button,[data-openlist],[data-mail]');if(!b)return;const lens=b.closest('[data-k]');const lk=lens&&lens.dataset.k;
+  if(b.dataset.go){learn(b.dataset.go,'open');const t=$(`[data-k="${b.dataset.go}"]`);if(t){t.scrollIntoView({behavior:'smooth',block:'center'});t.animate([{boxShadow:'0 0 0 2px #efede8'},{boxShadow:'0 0 0 0 transparent'}],{duration:1400});}else if(b.dataset.go==='lists')N.open('lists');return;}
+  if(b.dataset.rsvp){const row=b.closest('[data-inv]'),inv=((D.feed&&D.feed.invites)||[]).find(x=>x.id===row.dataset.inv);$$('button',row).forEach(x=>x.disabled=true);haptic();
+    const r=await api('POST','/api/google/rsvp',{id:row.dataset.inv,acct:inv&&inv.acct,response:b.dataset.rsvp});
+    if(r.ok){learn('replies',b.dataset.rsvp);D.feed.invites=D.feed.invites.filter(x=>x.id!==row.dataset.inv);toast('<b>'+({accepted:'Accepted',tentative:'Marked as maybe',declined:'Declined'})[b.dataset.rsvp]+'.</b> The organiser has been told.');render();}
+    else{$$('button',row).forEach(x=>x.disabled=false);toast(esc(r.json.needScope?'Allow calendar replies once at traceytech.app in Chrome.':(r.json.error||'Could not reply')));}return;}
+  if(b.dataset.tick){const id=Number(b.dataset.tick);b.classList.add('done');haptic();const r=await api('POST','/api/lists',{op:'state',todo:id,state:'done'});
+    if(r.ok){learn('lists','done');const t=(D.lists.todos||[]).find(x=>x.id===id);if(t)t.state='done';setTimeout(render,500);}else{b.classList.remove('done');toast('Could not tick that off');}return;}
+  if(b.dataset.openlist){learn('lists','open');N.open('lists');return;}
+  if(b.dataset.mail){learn('inbox','open');N.openUrl('https://mail.google.com/mail/u/0/#inbox/'+encodeURIComponent(b.dataset.mail));return;}
+  if(b.dataset.dir){learn('out','directions');N.openUrl('https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent(b.dataset.dir));return;}
+  if(b.dataset.va){const row=b.closest('[data-vn]');$$('button',row).forEach(x=>x.disabled=true);const r=await api('POST','/api/voice/act',{id:Number(row.dataset.vn),action:b.dataset.va});
+    if(r.ok){learn('voice',b.dataset.va);toast(b.dataset.va==='dismiss'?'Dismissed':'Done');load();}else{$$('button',row).forEach(x=>x.disabled=false);toast(esc(r.json.error||'Could not do that'));}return;}
+  if(b.dataset.web){N.open('site');return;}
+  if(b.dataset.share){const x=D.brief.ideas[+b.dataset.share];learn('conductor','share_draft');N.share('draft.txt','text/plain',x.draft);return;}
+  if(b.dataset.ideaOk!=null){learn('conductor','idea_useful');b.closest('.idea').style.opacity=.5;toast('Thanks. Conductor will suggest more like this.');return;}
+  if(b.dataset.ideaNo!=null){learn('conductor','idea_dismissed');b.closest('.idea').remove();return;}
+});
+
+/* ---------- press and hold a lens to drag it ---------- */
+let drag=null;
+document.addEventListener('touchstart',e=>{const lh=e.target.closest('.lens:not(.cond)');if(!lh||e.target.closest('button,input'))return;
+  const y=e.touches[0].clientY;clearTimeout(window._hold);
+  window._hold=setTimeout(()=>{drag={el:lh,y0:y,dy:0};lh.classList.add('lift');try{window.ConductorPage&&ConductorPage.top(false);}catch(e){}haptic();document.body.style.overflow='hidden';},480);},{passive:true});
+document.addEventListener('touchmove',e=>{if(!drag){clearTimeout(window._hold);return;}e.preventDefault();
+  const y=e.touches[0].clientY;drag.dy=y-drag.y0;drag.el.style.transform=`translateY(${drag.dy}px) scale(1.02)`;
+  const sibs=$$('.lens:not(.cond)').filter(x=>x!==drag.el);const mid=drag.el.getBoundingClientRect();const c=mid.top+mid.height/2;
+  for(const s of sibs){const r=s.getBoundingClientRect();
+    if(drag.dy>0&&s.compareDocumentPosition(drag.el)&Node.DOCUMENT_POSITION_PRECEDING&&c>r.top+r.height/2){s.after(drag.el);drag.y0+=r.height+12;drag.dy=y-drag.y0;drag.el.style.transform=`translateY(${drag.dy}px) scale(1.02)`;haptic();break;}
+    if(drag.dy<0&&s.compareDocumentPosition(drag.el)&Node.DOCUMENT_POSITION_FOLLOWING&&c<r.top+r.height/2){s.before(drag.el);drag.y0-=r.height+12;drag.dy=y-drag.y0;drag.el.style.transform=`translateY(${drag.dy}px) scale(1.02)`;haptic();break;}}
+  if(y<80)scrollBy(0,-12);else if(y>innerHeight-160)scrollBy(0,12);},{passive:false});
+function endDrag(){clearTimeout(window._hold);if(!drag)return;drag.el.classList.remove('lift');drag.el.style.transform='';document.body.style.overflow='';
+  const shown=$$('.lens:not(.cond)').map(x=>x.dataset.k),p=prefs();const rest=p.order.filter(k=>!shown.includes(k));
+  const order=[];let i=0;for(const k of p.order){order.push(shown.includes(k)?shown[i++]:k);}savePrefs(order);drag=null;toast('Order saved');}
+document.addEventListener('touchend',endDrag);document.addEventListener('touchcancel',endDrag);
+
+/* ---------- chat bar, typed or spoken ---------- */
+function chatSheet(){const s=sheet(`<h2>Conductor</h2><div class="msgs" id="msgs"></div>`);drawChat();return s;}
+function drawChat(){const m=$('#msgs');if(!m)return;m.innerHTML=D.chat.map((x,i)=>`<div class="m ${x.who==='me'?'me':'c'}">${esc(x.text)}${x.busy?'…':''}${(x.actions||[]).length?`<div class="acts">${x.actions.map((a,j)=>`<button class="pill${j?'':' solid'}" data-act="${i}:${j}">${esc(a.label)}</button>`).join('')}</div>`:''}${(x.actions||[]).filter(a=>a.type==='draft_email').map(a=>`<div class="draft">To: ${esc(a.to||'')}\nSubject: ${esc(a.subject||'')}\n\n${esc(a.body||'')}</div>`).join('')}</div>`).join('');
+  const s=$('#sheet');if(s)s.scrollTop=s.scrollHeight;}
+async function ask(text){text=String(text||'').trim();if(!text)return;learn('conductor','chat');
+  D.chat.push({who:'me',text});const reply={who:'c',text:'Thinking',busy:true};D.chat.push(reply);if(!$('#sheet.on'))chatSheet();else drawChat();
+  const r=await api('POST','/api/conductor',{op:'chat',text,context:context(),history:D.chat.slice(0,-2).map(x=>({who:x.who,text:x.text}))});
+  reply.busy=false;reply.text=r.ok?r.json.answer:(r.json.error||'Conductor is not answering. Try again.');reply.actions=r.ok?r.json.actions:[];drawChat();}
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-act]');if(!b)return;const [i,j]=b.dataset.act.split(':').map(Number);const a=D.chat[i].actions[j];b.disabled=true;
+  if(a.type==='add_todo'){const L=D.lists&&D.lists.lists||[];const l=L.find(x=>x.name.toLowerCase()===String(a.list||'').toLowerCase());
+    const r=await api('POST','/api/lists',{op:'add',text:a.text||a.label,list:l?l.id:'auto'});toast(r.ok?'Added to '+esc(r.json.listName||(l&&l.name)||'your lists'):esc(r.json.error||'Could not add'));if(r.ok)load();}
+  else if(a.type==='remember'){const r=await api('POST','/api/conductor',{op:'remember',text:a.text||a.label});toast(r.ok?'Conductor will remember that.':esc(r.json.error||'Could not save'));}
+  else if(a.type==='draft_email'){N.openUrl('https://mail.google.com/mail/?view=cm&fs=1&to='+encodeURIComponent(a.to||'')+'&su='+encodeURIComponent(a.subject||'')+'&body='+encodeURIComponent(a.body||''));}
+  else if(a.type==='open_lens'){closeSheet();const t=$(`[data-k="${a.lens}"]`);if(t)t.scrollIntoView({behavior:'smooth',block:'center'});else if(a.lens==='lists')N.open('lists');}
+  learn('conductor','action_'+a.type);});
+$('#bar').addEventListener('submit',e=>{e.preventDefault();const q=$('#q');const t=q.value;q.value='';q.blur();ask(t);});
+const mic=$('#mic');
+mic.addEventListener('touchstart',e=>{e.preventDefault();if(!N||!N.micStart)return;N.micStart();},{passive:false});
+mic.addEventListener('touchend',e=>{e.preventDefault();N&&N.micStop&&N.micStop();},{passive:false});
+mic.addEventListener('touchcancel',()=>{N&&N.micStop&&N.micStop();});
+window.onMicState=(state,detail)=>{mic.classList.toggle('rec',state==='listening');$('#micnote').textContent=detail||'';if(state!=='listening'&&state!=='thinking')setTimeout(()=>{$('#micnote').textContent='';},4000);};
+window.onMicText=t=>{$('#micnote').textContent='';if(t)ask(t);else toast('No speech heard. Hold the mic and speak.');};
+
+function fitDock(){document.documentElement.style.setProperty('--dock',(innerHeight-$('#dock').getBoundingClientRect().top)+'px');}
+addEventListener('resize',fitDock);
+window.onNativeShow=()=>load(false);
+window.onNativeReselect=()=>{window.scrollTo({top:0,behavior:'smooth'});load(true);};
+window.onNativeChange=()=>{if(!drag&&!document.querySelector('.lift'))render();};
+D.feed=cached('feed');D.lists=cached('lists');D.voice=cached('voice');D.brief=cached('brief');
+render();fitDock();load(false);
+setInterval(()=>{if(document.visibilityState==='visible')$('#when').textContent=hhmm(new Date());},30000);
+</script>
+</body>
+</html>
