@@ -38,6 +38,7 @@ class Bridge(private val a: MainActivity) {
                 "/api/google/feed" -> Cache.put(a, "feed", r.body)
                 "/api/voice" -> Cache.put(a, "voice", r.body)
                 "/api/lenses" -> Cache.put(a, "lenses", r.body)
+                "/api/search-console" -> Cache.put(a, "gsc", r.body)
             }
             if (r.ok && method == "POST" && path == "/api/conductor" && body?.contains("\"op\":\"brief\"") == true && r.body.contains("\"headline\""))
                 Cache.put(a, "brief", r.body)

@@ -115,6 +115,13 @@ h1.speak .w{display:inline-block;opacity:0;filter:blur(10px);transform:translate
 .newlens .ln-title{margin:0}.newlens p{margin:0;color:var(--mist);font-size:14px}
 #dzq{resize:none;font-size:16px;margin:10px 0 8px}
 .dzprev{margin:12px 0;padding:16px 16px 12px;border-radius:22px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:8px 0 4px}
+.stats div{padding:10px 8px;border-radius:14px;background:rgba(239,237,232,.05);box-shadow:inset 0 0 0 1px var(--line)}
+.stats b{display:block;font-weight:400;font-size:18px;letter-spacing:-.01em}.stats span{font-family:var(--f-data);font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ash)}
+.spark{display:block;width:100%;height:46px;margin:6px 0 2px}
+.swiping{transition:none!important}
+.sw-gone{transition:transform .25s var(--ease),opacity .25s,height .25s .1s,padding .25s .1s,margin .25s .1s!important}
+.sw-hint{font-family:var(--f-data);font-size:10.5px;letter-spacing:.05em;color:var(--ash);text-align:center;margin:0 0 6px}
 .foot-note{padding:30px 0 0;text-align:center;font-family:var(--f-data);font-size:11px;color:var(--ash);letter-spacing:.04em}
 /* dock: the chat bar keeps its own clear space */
 #fade{position:fixed;left:0;right:0;bottom:0;height:calc(var(--dock,92px) + 56px);pointer-events:none;z-index:19;
@@ -200,7 +207,7 @@ function dueTxt(d){const t=new Date(d.length===10?d+'T00:00':d);if(isNaN(t))retu
 const LENSES={
   schedule:{name:'Schedule',dot:'#8ab4f8'},replies:{name:'Replies',dot:'#ffa657'},lists:{name:'Lists',dot:'#3fb950'},
   inbox:{name:'Inbox',dot:'#bc8cff'},out:{name:'Out and about',dot:'#58a6ff'},voice:{name:'Voice notes',dot:'#ff7eb6'},
-  trips:{name:'Trips and plans',dot:'#e3b341'},conns:{name:'Connections',dot:'#e5322b'}};
+  trips:{name:'Trips and plans',dot:'#e3b341'},seo:{name:'Search Console',dot:'#56d4dd'},conns:{name:'Connections',dot:'#e5322b'}};
 const D={feed:null,feedErr:'',lists:null,voice:null,brief:null,links:{},briefBusy:false,chat:[],spoken:false};
 function prefs(){let p={};try{p=JSON.parse((N&&N.lensPrefs&&N.lensPrefs())||'{}');}catch(e){}
   const order=(p.order||[]).filter(k=>LENSES[k]||/^c\d+$/.test(k));Object.keys(LENSES).forEach(k=>{if(!order.includes(k))order.push(k);});
@@ -245,9 +252,9 @@ R.lists=()=>{const L=D.lists;if(!L||!L.lists)return null;const open=(L.todos||[]
   const late=open.filter(t=>rank(t)<Date.now()).length;
   return {n:open.length,crit:late>0,html:`<div class="ln-title">${late?late+' overdue':'To-do'}</div>${noteFor('lists')}<div class="big">${open.length}<small>open</small></div>
     <div class="chips">${withItems.map(x=>`<button class="chip" data-openlist="${x.l.id}">${esc(x.l.name)}<span>${x.items.length}</span></button>`).join('')}</div>`+
-    top.map(t=>{const d=rank(t),lt=d<Date.now();return `<div class="rowi" data-todo="${t.id}"><button class="tick" data-tick="${t.id}" aria-label="Done"></button><div class="b"><div>${esc(t.text)}</div><div class="s">${esc(nm.get(t.list)||'')}${t.due?` · <span class="${lt?'crit':''}">${esc(dueTxt(t.due))}</span>`:''}</div></div></div>`;}).join('')};};
-R.inbox=()=>{const m=((D.feed&&D.feed.emails)||[]).filter(x=>!x.bulk);if(!m.length)return null;
-  return {n:m.length,html:`<div class="ln-title">${m.length} from real people</div>${noteFor('inbox')}`+m.slice(0,5).map(x=>`<div class="rowi" data-mail="${esc(x.thread||x.id)}"><div class="b"><div>${esc(x.subject||'(no subject)')}</div><div class="s">${esc(String(x.from||'').replace(/<.*>/,'').trim())} · ${esc(String(x.snippet||'').slice(0,90))}</div></div></div>`).join('')};};
+    top.map(t=>{const d=rank(t),lt=d<Date.now();return `<div class="rowi" data-sw="x" data-swact="tick" data-todo="${t.id}"><button class="tick" data-tick="${t.id}" aria-label="Done"></button><div class="b"><div>${esc(t.text)}</div><div class="s">${esc(nm.get(t.list)||'')}${t.due?` · <span class="${lt?'crit':''}">${esc(dueTxt(t.due))}</span>`:''}</div></div></div>`;}).join('')};};
+R.inbox=()=>{const m=((D.feed&&D.feed.emails)||[]).filter(x=>!x.bulk&&!hidden('mail:'+(x.thread||x.id)));if(!m.length)return null;
+  return {n:m.length,html:`<div class="ln-title">${m.length} from real people</div>${noteFor('inbox')}`+m.filter(x=>!hidden('mail:'+(x.thread||x.id))).slice(0,5).map(x=>`<div class="rowi" data-sw="x" data-hide="mail:${esc(x.thread||x.id)}" data-mail="${esc(x.thread||x.id)}"><div class="b"><div>${esc(x.subject||'(no subject)')}</div><div class="s">${esc(String(x.from||'').replace(/<.*>/,'').trim())} · ${esc(String(x.snippet||'').slice(0,90))}</div></div></div>`).join('')};};
 R.out=()=>{const now=Date.now(),ev=events().filter(e=>e.where&&!isOnline(e)&&+e.s>now-36e5&&+e.s<now+36*36e5);
   const er=D.lists&&D.lists.lists?(()=>{const l=D.lists.lists.find(x=>x.cat==='town'||x.name==='Errands');return l?(D.lists.todos||[]).filter(t=>t.list===l.id&&t.state==='open'):[];})():[];
   if(!ev.length&&!er.length)return null;
@@ -258,7 +265,7 @@ R.out=()=>{const now=Date.now(),ev=events().filter(e=>e.where&&!isOnline(e)&&+e.
   return {html:h,n:ev.length+er.length};};
 R.voice=()=>{const rows=((D.voice&&D.voice.rows)||[]).filter(n=>n.state==='pending'||Date.now()-Date.parse(n.created)<864e5);if(!rows.length)return null;
   const wait=rows.filter(n=>n.state==='pending').length;
-  return {n:rows.length,crit:wait>0,html:`<div class="ln-title">${wait?wait+' waiting for your OK':'Today\'s notes'}</div>${noteFor('voice')}`+rows.slice(0,4).map(n=>`<div class="rowi" data-vn="${n.id}"><div class="b"><div>${esc(n.summary||n.title||n.transcript||'Voice note')}</div><div class="s">${esc(hhmm(n.created))}${n.state==='pending'?' · <span class="warnc">waiting for your OK</span>':''}</div>
+  return {n:rows.length,crit:wait>0,html:`<div class="ln-title">${wait?wait+' waiting for your OK':'Today\'s notes'}</div>${noteFor('voice')}`+rows.slice(0,4).map(n=>`<div class="rowi" data-sw="x" data-swact="voice" data-vn="${n.id}"><div class="b"><div>${esc(n.summary||n.title||n.transcript||'Voice note')}</div><div class="s">${esc(hhmm(n.created))}${n.state==='pending'?' · <span class="warnc">waiting for your OK</span>':''}</div>
     ${n.state==='pending'?`<div class="grid2">${n.intent==='calendar'?'<button class="pill solid" data-va="calendar">Add to calendar</button>':n.intent==='email'?'<button class="pill solid" data-va="email">Send email</button>':''}<button class="pill" data-va="todo">Make a to-do</button><button class="pill" data-va="dismiss">Dismiss</button></div>`:''}</div></div>`).join('')};};
 R.trips=()=>{const now=new Date(),up=TRIPS.filter(t=>+t.start+t.days*DAY>now&&+t.start-now<200*DAY);if(!up.length)return null;let crit=false;
   const h=up.map(t=>{const d=Math.ceil((t.start-now)/DAY);let warn='';
@@ -301,7 +308,7 @@ function cardActions(c){const a=[];
   if(c.lens&&LENSES[c.lens])a.push(`<button class="pill" data-go="${esc(c.lens)}">${esc(lensName(c.lens))}</button>`);
   return a.join('');}
 function deckDraw(){const cs=cards();$('#focusSec').hidden=!cs.length;if(!cs.length)return;
-  $('#deck').innerHTML=cs.map(c=>`<article class="fc card${c.crit?' alert':''}" data-lensk="${esc(c.lens||'')}"><div class="eye"><span>${esc(c.kind==='idea'?'Idea':lensName(c.lens))}</span>${c.state?`<span class="state${c.crit?' crit':''}"><i></i>${esc(c.state)}</span>`:''}</div>
+  $('#deck').innerHTML=cs.map((c,ci)=>`<article data-sw="up" data-ci="${ci}" class="fc card${c.crit?' alert':''}" data-lensk="${esc(c.lens||'')}"><div class="eye"><span>${esc(c.kind==='idea'?'Idea':lensName(c.lens))}</span>${c.state?`<span class="state${c.crit?' crit':''}"><i></i>${esc(c.state)}</span>`:''}</div>
     <h3>${esc(c.title)}</h3>${c.why?`<p>${esc(c.why)}</p>`:''}${c.draft?`<div class="draft">${esc(c.draft)}</div>`:''}<div class="foot">${cardActions(c)}</div></article>`).join('');
   $('#dots').innerHTML=cs.map(()=>'<i></i>').join('');$('#focusMeta').textContent=cs.length+' to look at';deckFx();}
 const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;let deckI=-1;
@@ -315,6 +322,64 @@ function deckFx(){const deck=$('#deck');const r=deck.getBoundingClientRect();con
   $$('#dots i').forEach((d,i)=>d.classList.toggle('on',i===best));}
 $('#deck').addEventListener('scroll',()=>requestAnimationFrame(deckFx),{passive:true});
 
+/* ---------- Search Console: how people find his website ---------- */
+function spark(d){if(!d||d.length<2)return '';const mx=Math.max(1,...d.map(x=>x.c)),W=300,H=46,st=W/(d.length-1);
+  const pts=d.map((x,i)=>`${(i*st).toFixed(1)},${(H-3-(x.c/mx)*(H-8)).toFixed(1)}`).join(' ');
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><polygon points="0,${H} ${pts} ${W},${H}" fill="rgba(86,212,221,.12)"/><polyline points="${pts}" fill="none" stroke="#56d4dd" stroke-width="1.6" vector-effect="non-scaling-stroke"/></svg>`;}
+const num=v=>typeof v==='number'?v.toLocaleString('en-GB'):String(v);
+R.seo=()=>{const g=D.gsc;if(!g)return null;
+  if(!g.totals)return {n:1,html:`<div class="ln-title">Search Console</div><p class="empty">${esc(g.error||'Not available yet.')}</p>`};
+  const t=g.totals,ch=g.change,site=String(g.site).replace(/^sc-domain:/,'').replace(/^https?:\/\//,'').replace(/\/$/,'');
+  let h=`<div class="ln-title">${num(t.clicks)} clicks to ${esc(site)}${ch!=null?` <span class="${ch<0?'crit':'okc'}">${ch>0?'+':''}${ch}%</span>`:''}</div>${noteFor('seo')}
+    <div class="s" style="color:var(--ash);font-size:12.5px">Last 28 days${ch!=null?', compared with the 28 before':''}${g.stale?' · could not refresh just now':''}</div>${spark(g.daily)}
+    <div class="stats">${[['Clicks',t.clicks],['Seen',t.impressions],['Click rate',t.ctr+'%'],['Position',t.position]].map(([k,v])=>`<div><b>${esc(num(v))}</b><span>${k}</span></div>`).join('')}</div>`;
+  h+=(g.problems||[]).filter(x=>!hidden('gsc:'+x)).slice(0,3).map(x=>`<div class="rowi" data-sw="x" data-hide="gsc:${esc(x)}"><div class="tm crit">Fix</div><div class="b"><div>${esc(x)}</div></div></div>`).join('');
+  h+=(g.chances||[]).filter(x=>!hidden('gsc:'+x.q)).slice(0,3).map(x=>`<div class="rowi" data-sw="x" data-hide="gsc:${esc(x.q)}"><div class="tm okc">Chance</div><div class="b"><div>“${esc(x.q)}”</div><div class="s">${esc(num(x.i))} views, position ${esc(x.pos)}: ${esc(x.why)}</div></div></div>`).join('');
+  const top=(g.queries||[]).slice(0,3);if(top.length)h+=`<div class="rowi"><div class="tm">Top</div><div class="b"><div>${top.map(x=>esc(x.q)).join(' · ')}</div><div class="s">${top.map(x=>num(x.c)+' clicks').join(' · ')}</div></div></div>`;
+  h+=`<div class="grid2"><button class="pill" data-url="${esc(g.open)}">Open Search Console</button><button class="pill" data-gscfresh="1">Refresh</button></div>`;
+  return {html:h,n:Math.max(1,(g.problems||[]).length+(g.chances||[]).length),crit:(g.problems||[]).some(x=>/down/.test(x))};};
+
+/* ---------- things you swiped away stay away (two weeks, this phone only) ---------- */
+function hiddenMap(){try{return JSON.parse(localStorage.getItem('cio_hidden')||'{}');}catch(e){return {};}}
+function hidden(k){return !!hiddenMap()[k];}
+function hide(k){const m=hiddenMap(),now=Date.now();m[k]=now;for(const x in m)if(now-m[x]>14*864e5)delete m[x];try{localStorage.setItem('cio_hidden',JSON.stringify(m));}catch(e){}}
+
+/* ---------- gestures: swipe sideways to clear, swipe a focus card up, pull a sheet down ---------- */
+let sw=null;
+document.addEventListener('touchstart',e=>{if(e.touches.length!==1)return;const t=e.touches[0];
+  const el=e.target.closest('[data-sw],#toast'),sh=e.target.closest('#sheet');if(!el&&!sh)return;
+  sw={el,sh,x0:t.clientX,y0:t.clientY,dx:0,dy:0,mode:null};},{passive:true});
+document.addEventListener('touchmove',e=>{if(!sw||drag)return;const t=e.touches[0];sw.dx=t.clientX-sw.x0;sw.dy=t.clientY-sw.y0;
+  if(!sw.mode){if(Math.abs(sw.dx)<10&&Math.abs(sw.dy)<10)return;const horiz=Math.abs(sw.dx)>Math.abs(sw.dy)*1.3,vert=Math.abs(sw.dy)>Math.abs(sw.dx)*1.3;
+    const k=sw.el&&(sw.el.id==='toast'?'x':sw.el.dataset.sw);
+    if(horiz&&k==='x')sw.mode='x';else if(vert&&sw.dy<0&&k==='up')sw.mode='up';
+    else if(vert&&sw.dy>0&&sw.sh&&sw.sh.scrollTop<=0)sw.mode='down';else{sw=null;return;}
+    clearTimeout(window._hold);const tg=sw.mode==='down'?sw.sh:sw.el;tg.classList.add('swiping');sw.tg=tg;}
+  e.preventDefault();
+  if(sw.mode==='x'){sw.tg.style.transform=`translateX(${sw.dx}px)`;sw.tg.style.opacity=String(Math.max(.2,1-Math.abs(sw.dx)/innerWidth));}
+  else if(sw.mode==='up'){const d=Math.min(0,sw.dy);sw.tg.style.transform=`translateY(${d}px) scale(${1+d/2000})`;sw.tg.style.opacity=String(Math.max(.2,1+d/400));}
+  else{sw.tg.style.transform=`translateY(${Math.max(0,sw.dy)}px)`;}},{passive:false});
+function swEnd(){if(!sw||!sw.mode){sw=null;return;}const s=sw;sw=null;const tg=s.tg;tg.classList.remove('swiping');
+  const far=s.mode==='x'?Math.abs(s.dx)>Math.min(140,tg.offsetWidth*.33):s.mode==='up'?s.dy<-90:s.dy>110;
+  if(!far){tg.style.transform='';tg.style.opacity='';return;}
+  haptic();
+  if(s.mode==='down'){tg.style.transform='';closeSheet();return;}
+  tg.classList.add('sw-gone');tg.style.transform=s.mode==='x'?`translateX(${s.dx>0?'':'-'}110%)`:'translateY(-120%)';tg.style.opacity='0';
+  setTimeout(()=>{tg.classList.remove('sw-gone');tg.style.transform='';tg.style.opacity='';swiped(tg,s);},260);}
+document.addEventListener('touchend',swEnd);document.addEventListener('touchcancel',()=>{if(sw&&sw.tg){sw.tg.classList.remove('swiping');sw.tg.style.transform='';sw.tg.style.opacity='';}sw=null;});
+async function swiped(el,s){
+  if(el.id==='toast'){el.classList.remove('on');return;}
+  if(el.classList.contains('m')){D.chat.splice(+el.dataset.ci,1);drawChat();learn('conductor','chat_cleared');return;}
+  if(el.classList.contains('fc')){const c=cards()[+el.dataset.ci];if(!c)return;
+    if(c.kind==='idea'){const x=D.brief.ideas[c.i];learn('conductor','idea_dismissed',x&&x.text);D.brief.ideas.splice(c.i,1);toast('Not now. Conductor will not suggest it again this week.');}
+    else{const x=D.brief.steps[c.i];learn(x&&x.lens||'conductor','step_cleared',x&&x.text);D.brief.steps.splice(c.i,1);toast('Cleared');}
+    deckDraw();heroDraw();return;}
+  if(el.dataset.swact==='tick'){const id=Number(el.dataset.todo);const r=await api('POST','/api/lists',{op:'state',todo:id,state:'done'});
+    if(r.ok){learn('lists','done_swipe');const t=(D.lists.todos||[]).find(x=>x.id===id);if(t)t.state='done';toast('Done');}else toast('Could not tick that off');lensesDraw();return;}
+  if(el.dataset.swact==='voice'){const r=await api('POST','/api/voice/act',{id:Number(el.dataset.vn),action:'dismiss'});if(r.ok){learn('voice','dismiss_swipe');toast('Dismissed');load();}else{toast('Could not dismiss it');lensesDraw();}return;}
+  if(el.dataset.hide){hide(el.dataset.hide);learn(el.closest('.lens')?.dataset.k?.startsWith('c')?'custom':(el.closest('.lens')?.dataset.k||'conductor'),'cleared');lensesDraw();toast('Cleared. It stays hidden on this phone.');return;}
+}
+
 /* ---------- lenses you design yourself, by describing them ---------- */
 const EXAMPLES=['BBC news headlines about police and law','Kent Police news and appeals','New posts on a website I name','Weather warnings for Kent'];
 function useCustom(list){if(!Array.isArray(list))return;D.custom=list;
@@ -326,8 +391,9 @@ function keyForm(l){return `<div class="keybox"><p class="s">${esc(l.keyHelp||'T
 function customLens(l,preview){const noKey=l.needsKey&&!l.hasKey;
   let h=`<div class="ln-title">${esc(l.note||l.summary||l.name)}</div>`;
   if(noKey)h+=keyForm(l);
-  if(l.items.length)h+=l.items.map(x=>`<button class="rowi link" data-url="${esc(x.url)}"><div class="tm">${esc(agoTxt(x.when))}</div><div class="b"><div>${esc(x.title)}</div><div class="s">${esc(x.src||'')}</div></div></button>`).join('');
-  else if(!noKey)h+=`<p class="empty">${esc(l.error||'Nothing new right now.')}</p>`;
+  const its=l.items.filter(x=>!hidden('url:'+x.url));
+  if(its.length)h+=its.map(x=>`<button class="rowi link" data-sw="x" data-hide="url:${esc(x.url)}" data-url="${esc(x.url)}"><div class="tm">${esc(agoTxt(x.when))}</div><div class="b"><div>${esc(x.title)}</div><div class="s">${esc(x.src||'')}</div></div></button>`).join('');
+  else if(!noKey)h+=`<p class="empty">${esc(l.items.length?'You have cleared everything here.':(l.error||'Nothing new right now.'))}</p>`;
   if(l.error&&l.items.length)h+=`<p class="empty">Last check: ${esc(l.error)}. Showing the last headlines.</p>`;
   if(!preview)h+=`<div class="grid2"><button class="pill" data-lchange="${l.id}">Change</button><button class="pill" data-lrefresh="${l.id}">Refresh</button></div>`;
   return {html:h,n:l.items.length||1,crit:false};}
@@ -385,6 +451,7 @@ let loading=false;
 async function load(fresh){if(loading)return;loading=true;
   const [f,l,v,c,cl]=await Promise.all([api('GET','/api/google/feed'),api('GET','/api/lists'),api('GET','/api/voice'),api('GET','/api/conductor'),api('GET','/api/lenses')]);
   if(cl.ok)useCustom(cl.json.lenses);
+  api('GET','/api/search-console').then(g=>{if(g.ok){D.gsc=g.json;if(!drag)lensesDraw();}});
   if(f.ok){D.feed=f.json;D.feedErr='';}else if(f.code&&f.code!==401)D.feedErr=f.json.error||'Google is not answering';
   if(l.ok)D.lists=l.json;if(v.ok)D.voice=v.json;if(c.ok){D.links=c.json.links||D.links;if(c.json.brief&&!D.brief)D.brief=c.json.brief;}
   render();loading=false;brief(fresh);if(cl.ok&&cl.json.lenses.length)customRefresh(0);}
@@ -409,6 +476,7 @@ document.addEventListener('click',async e=>{const b=e.target.closest('button,[da
   if(b.dataset.dir){learn('out','directions');N.openUrl('https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent(b.dataset.dir));return;}
   if(b.dataset.va){const row=b.closest('[data-vn]');$$('button',row).forEach(x=>x.disabled=true);const r=await api('POST','/api/voice/act',{id:Number(row.dataset.vn),action:b.dataset.va});
     if(r.ok){learn('voice',b.dataset.va);toast(b.dataset.va==='dismiss'?'Dismissed':'Done');load();}else{$$('button',row).forEach(x=>x.disabled=false);toast(esc(r.json.error||'Could not do that'));}return;}
+  if(b.dataset.gscfresh){b.disabled=true;b.textContent='Looking…';const r=await api('GET','/api/search-console?fresh=1');if(r.ok){D.gsc=r.json;lensesDraw();}else{b.disabled=false;b.textContent='Refresh';toast(esc(r.json.error||'Search Console did not answer'));}return;}
   if(b.id==='newLens'){learn('custom','new');designer(null);return;}
   if(b.dataset.url!=null){learn('custom','open');if(b.dataset.url)N.openUrl(b.dataset.url);return;}
   if(b.dataset.lchange){const l=(D.custom||[]).find(x=>x.id===+b.dataset.lchange);if(l){designer(l);dzShow(l,'');}return;}
@@ -449,7 +517,7 @@ document.addEventListener('touchend',endDrag);document.addEventListener('touchca
 
 /* ---------- chat bar, typed or spoken ---------- */
 function chatSheet(){const s=sheet(`<h2>Conductor</h2><div class="msgs" id="msgs"></div>`);drawChat();return s;}
-function drawChat(){const m=$('#msgs');if(!m)return;m.innerHTML=D.chat.map((x,i)=>`<div class="m ${x.who==='me'?'me':'c'}">${esc(x.text)}${x.busy?'…':''}${(x.actions||[]).length?`<div class="acts">${x.actions.map((a,j)=>`<button class="pill${j?'':' solid'}" data-act="${i}:${j}">${esc(a.label)}</button>`).join('')}</div>`:''}${(x.actions||[]).filter(a=>a.type==='draft_email').map(a=>`<div class="draft" style="margin-top:8px">To: ${esc(a.to||'')}\nSubject: ${esc(a.subject||'')}\n\n${esc(a.body||'')}</div>`).join('')}</div>`).join('');
+function drawChat(){const m=$('#msgs');if(!m)return;m.innerHTML=(D.chat.length?'<p class="sw-hint">Swipe a message sideways to clear it</p>':'<p class="empty" style="text-align:center">Nothing here. Ask Conductor anything.</p>')+D.chat.map((x,i)=>`<div class="m ${x.who==='me'?'me':'c'}" data-sw="x" data-ci="${i}">${esc(x.text)}${x.busy?'…':''}${(x.actions||[]).length?`<div class="acts">${x.actions.map((a,j)=>`<button class="pill${j?'':' solid'}" data-act="${i}:${j}">${esc(a.label)}</button>`).join('')}</div>`:''}${(x.actions||[]).filter(a=>a.type==='draft_email').map(a=>`<div class="draft" style="margin-top:8px">To: ${esc(a.to||'')}\nSubject: ${esc(a.subject||'')}\n\n${esc(a.body||'')}</div>`).join('')}</div>`).join('');
   const s=$('#sheet');if(s)s.scrollTop=s.scrollHeight;}
 async function ask(text,spoken){text=String(text||'').trim();if(!text)return;learn('conductor',spoken?'chat_voice':'chat');
   D.chat.push({who:'me',text});const reply={who:'c',text:'Thinking',busy:true};D.chat.push(reply);if(!$('#sheet.on'))chatSheet();else drawChat();
@@ -482,7 +550,7 @@ addEventListener('scroll',()=>{$('#bar').classList.toggle('solid',scrollY>innerH
 window.onNativeShow=()=>load(false);
 window.onNativeReselect=()=>{window.scrollTo({top:0,behavior:'smooth'});load(true);};
 window.onNativeChange=()=>{if(!drag&&!document.querySelector('.lift'))lensesDraw();};
-useCustom((cached('lenses')||{}).lenses);D.feed=cached('feed');D.lists=cached('lists');D.voice=cached('voice');D.brief=cached('brief');if(D.brief&&D.brief.links)D.links=D.brief.links;
+useCustom((cached('lenses')||{}).lenses);D.gsc=cached('gsc');D.feed=cached('feed');D.lists=cached('lists');D.voice=cached('voice');D.brief=cached('brief');if(D.brief&&D.brief.links)D.links=D.brief.links;
 render();fitDock();load(false);
 setInterval(()=>{if(document.visibilityState!=='visible')return;$('#clock').textContent=hhmm(new Date());
   if(D.brief&&D.brief.validUntil&&Date.now()>Date.parse(D.brief.validUntil)&&!D.briefBusy)brief(false);},30000);
