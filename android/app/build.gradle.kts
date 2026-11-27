@@ -20,7 +20,7 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "uk.co.noteai.app"
+        applicationId = "app.traceytech.conductor"
         minSdk = 33
         targetSdk = 36
         versionCode = 101
