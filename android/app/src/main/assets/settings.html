@@ -48,6 +48,7 @@ const LENS_INFO=[['schedule','Schedule','Your shift, today and tomorrow. Online 
   ['voice','Voice notes','Recent notes from the fob or the phone, and anything waiting for your OK.'],
   ['trips','Trips and plans','Countdowns to trips, and a warning when you are due to work.'],
   ['conns','Connections','Only shows when something is broken, such as Google or the fob.']];
+try{const c=JSON.parse((window.Native&&Native.cached('lenses'))||'{}');(c.lenses||[]).forEach(l=>LENS_INFO.push([l.key,l.name,(l.summary||'A lens you designed')+' You designed this one. Change or delete it from its card on Home.']));}catch(e){}
 let MEM=null,MEMERR='';
 function lensPrefs(){try{return JSON.parse(N.lensPrefs()||'{}');}catch(e){return {};}}
 async function loadMem(){const r=await api('GET','/api/conductor');if(r.ok){MEM=r.json.memory||[];MEMERR='';}else MEMERR=r.code===401?'Sign in to see what Conductor remembers.':(r.json.error||'Not available yet');render();}

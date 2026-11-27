@@ -30,16 +30,18 @@ class Bridge(private val a: MainActivity) {
         io.execute {
             val r = if (method == "GET") Net.get(path)
             else Net.call("POST", path, (body ?: "{}").toByteArray(), "application/json",
-                timeoutMs = if (path == "/api/conductor") 120000 else 30000)  // Conductor thinks twice before it answers
+                timeoutMs = if (path == "/api/conductor" || path == "/api/lenses") 120000 else 30000)  // Conductor thinks twice; lens design tests the site
             if (r.signedOut) main.post { Notifier.signIn(a) }
             if (r.ok && method == "GET") when (path) {
                 "/api/lists" -> Cache.put(a, "lists", r.body)
                 "/api/todos" -> Cache.put(a, "todos", r.body)
                 "/api/google/feed" -> Cache.put(a, "feed", r.body)
                 "/api/voice" -> Cache.put(a, "voice", r.body)
+                "/api/lenses" -> Cache.put(a, "lenses", r.body)
             }
             if (r.ok && method == "POST" && path == "/api/conductor" && body?.contains("\"op\":\"brief\"") == true && r.body.contains("\"headline\""))
                 Cache.put(a, "brief", r.body)
+            if (r.ok && method == "POST" && path == "/api/lenses" && body?.contains("\"op\":\"refresh\"") == true && !body.contains("\"id\"")) Cache.put(a, "lenses", r.body)
             if (r.ok && method == "POST" && (path == "/api/lists" || path == "/api/todos")) main.post { Sync.now(a) }
             reply(id, r.code, r.body)
         }

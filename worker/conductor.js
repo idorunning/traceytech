@@ -80,6 +80,8 @@ async function condContext(env,client){
     if(Array.isArray(client.lenses))ctx.lensesOn=client.lenses.slice(0,12).map(s=>condClip(s,20));
     if(Array.isArray(client.shiftsData))ctx._shifts=client.shiftsData.slice(0,4).filter(s=>s&&typeof s==='object').map(s=>({kind:condClip(s.kind,2),start:Date.parse(s.start)||0,end:Date.parse(s.end)||0}));
   }
+  try{ctx.myLenses=((await env.DB.prepare('SELECT spec,items FROM custom_lenses ORDER BY id LIMIT 20').all()).results||[]).map(x=>{const sp=JSON.parse(x.spec);
+    return {name:sp.name,shows:condClip(sp.summary,100),top:JSON.parse(x.items||'[]').slice(0,3).map(i=>condClip(i.title,110))};});}catch(e){} // lenses he designed himself
   const mem=(await env.DB.prepare("SELECT id,kind,text FROM conductor_memory ORDER BY id DESC LIMIT 60").all()).results||[];
   ctx.facts=mem.filter(m=>m.kind==='fact').map(m=>m.text).slice(0,40);
   ctx.profile=(mem.find(m=>m.kind==='profile')||{}).text||'';
@@ -146,7 +148,7 @@ const BRIEF_SCHEMA={type:'object',additionalProperties:false,required:['headline
 const CHAT_SCHEMA={type:'object',additionalProperties:false,required:['answer','actions'],properties:{
   answer:{type:'string'},
   actions:{type:'array',items:{type:'object',additionalProperties:false,required:['type','label'],properties:{
-    type:{type:'string',enum:['add_todo','remember','draft_email','open_lens','join']},label:{type:'string'},
+    type:{type:'string',enum:['add_todo','remember','draft_email','open_lens','join','make_lens']},label:{type:'string'},
     text:{type:'string'},list:{type:'string'},to:{type:'string'},subject:{type:'string'},body:{type:'string'},lens:{type:'string'},ref:{type:'string'}}}}}};
 
 /* Claude with thinking for Conductor; falls back to the lists agent's call (Claude, then Workers AI). */
@@ -207,7 +209,7 @@ async function condChat(env,text,client,history){
   const h=(Array.isArray(history)?history:[]).slice(-8).map(m=>`${m.who==='me'?'Nathan':'Conductor'}: ${condClip(m.text,400)}`).join('\n');
   const out=await condAI(env,COND_SYSTEM+`
 Answer his message helpfully and briefly (it may be read aloud, so no lists of more than three things). When he asks you to do something, propose it as an action; nothing happens until he presses it.
-Actions: add_todo (text, list = one of his list names), remember (text = a fact or preference to keep, when he tells you one), draft_email (to, subject, body, when he asks for an email), open_lens (lens), join (ref = the event id of an online meeting with a join link).`,
+Actions: add_todo (text, list = one of his list names), remember (text = a fact or preference to keep, when he tells you one), draft_email (to, subject, body, when he asks for an email), open_lens (lens), join (ref = the event id of an online meeting with a join link), make_lens (text = his description of a new lens to watch a news feed, website or API, when he asks for one; the app designs and tests it).`,
     `Signals (facts worked out by code):\n${condSig(ctx)}\n\nData:\n${condData(ctx)}\n\nConversation so far:\n${h||'(none)'}\n\nNathan: ${condClip(text,1000)}`,CHAT_SCHEMA,'medium');
   if(!out||!out.data)return {answer:'Sorry, I could not think just now. Try again in a moment.',actions:[]};
   const acts=(out.data.actions||[]).slice(0,4).map(a=>a.type==='join'?{...a,url:ctx.joinLinks[a.ref]||''}:a).filter(a=>a.type!=='join'||a.url);

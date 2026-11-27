@@ -105,6 +105,16 @@ h1.speak .w{display:inline-block;opacity:0;filter:blur(10px);transform:translate
 .chip span{color:var(--ash);margin-left:6px}
 .skel{height:14px;border-radius:7px;background:#ffffff12;margin:10px 0}
 .empty{color:var(--ash);font-size:14px;margin:4px 0}
+.rowi.link{width:100%;text-align:left;background:none;border:0;border-top:1px solid var(--line);color:inherit;font:inherit;padding:11px 0;cursor:pointer}
+.rowi.link:active{opacity:.6}
+.keybox{margin:8px 0 4px;padding:12px;border-radius:16px;background:rgba(9,9,10,.45);box-shadow:inset 0 0 0 1px var(--line2)}
+.keybox .s{margin:0 0 8px;color:var(--mist);font-size:13.5px}
+.krow{display:flex;gap:8px}.krow input{flex:1;min-width:0}
+.newlens{display:flex;flex-direction:column;gap:10px;align-items:flex-start;padding:22px 20px;margin-top:14px;width:100%;text-align:left;font:inherit;color:inherit}
+.newlens .plus{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:rgba(239,237,232,.1);font-size:22px;line-height:1}
+.newlens .ln-title{margin:0}.newlens p{margin:0;color:var(--mist);font-size:14px}
+#dzq{resize:none;font-size:16px;margin:10px 0 8px}
+.dzprev{margin:12px 0;padding:16px 16px 12px;border-radius:22px}
 .foot-note{padding:30px 0 0;text-align:center;font-family:var(--f-data);font-size:11px;color:var(--ash);letter-spacing:.04em}
 /* dock: the chat bar keeps its own clear space */
 #fade{position:fixed;left:0;right:0;bottom:0;height:calc(var(--dock,92px) + 56px);pointer-events:none;z-index:19;
@@ -144,7 +154,8 @@ h1.speak .w{display:inline-block;opacity:0;filter:blur(10px);transform:translate
   </section>
   <section class="sec" id="focusSec" hidden><header><h2>Focus</h2><span class="meta" id="focusMeta">Swipe</span></header>
     <div class="deck" id="deck"></div><div class="dots" id="dots"></div></section>
-  <section class="sec"><header><h2>Lenses</h2><span class="meta">Hold to move</span></header><div id="lenses"></div></section>
+  <section class="sec"><header><h2>Lenses</h2><span class="meta">Hold to move</span></header><div id="lenses"></div>
+    <button class="newlens card reveal" id="newLens"><span class="plus">+</span><span class="ln-title">Design a lens</span><p>Describe it and Conductor builds it. A news topic, a website, or an API with your own key.</p></button></section>
   <p class="foot-note" id="footnote"></p>
 </div>
 <div id="fade"></div>
@@ -190,10 +201,9 @@ const LENSES={
   schedule:{name:'Schedule',dot:'#8ab4f8'},replies:{name:'Replies',dot:'#ffa657'},lists:{name:'Lists',dot:'#3fb950'},
   inbox:{name:'Inbox',dot:'#bc8cff'},out:{name:'Out and about',dot:'#58a6ff'},voice:{name:'Voice notes',dot:'#ff7eb6'},
   trips:{name:'Trips and plans',dot:'#e3b341'},conns:{name:'Connections',dot:'#e5322b'}};
-const DEFAULT_ORDER=Object.keys(LENSES);
 const D={feed:null,feedErr:'',lists:null,voice:null,brief:null,links:{},briefBusy:false,chat:[],spoken:false};
 function prefs(){let p={};try{p=JSON.parse((N&&N.lensPrefs&&N.lensPrefs())||'{}');}catch(e){}
-  const order=(p.order||[]).filter(k=>LENSES[k]);DEFAULT_ORDER.forEach(k=>{if(!order.includes(k))order.push(k);});
+  const order=(p.order||[]).filter(k=>LENSES[k]||/^c\d+$/.test(k));Object.keys(LENSES).forEach(k=>{if(!order.includes(k))order.push(k);});
   return {order,off:new Set(p.off||[])};}
 function savePrefs(order){const p=prefs();try{N.setLensPrefs(JSON.stringify({order,off:[...p.off]}));}catch(e){}}
 function learn(lens,action,text){api('POST','/api/conductor',{op:'event',lens,action,text});}
@@ -305,9 +315,54 @@ function deckFx(){const deck=$('#deck');const r=deck.getBoundingClientRect();con
   $$('#dots i').forEach((d,i)=>d.classList.toggle('on',i===best));}
 $('#deck').addEventListener('scroll',()=>requestAnimationFrame(deckFx),{passive:true});
 
+/* ---------- lenses you design yourself, by describing them ---------- */
+const EXAMPLES=['BBC news headlines about police and law','Kent Police news and appeals','New posts on a website I name','Weather warnings for Kent'];
+function useCustom(list){if(!Array.isArray(list))return;D.custom=list;
+  Object.keys(LENSES).forEach(k=>{if(LENSES[k].custom){delete LENSES[k];delete R[k];}});
+  list.forEach(l=>{LENSES[l.key]={name:l.name,dot:l.color,custom:l};R[l.key]=()=>customLens(l);});}
+const agoTxt=t=>{if(!t)return '';const m=Math.round((Date.now()-t)/6e4);return m<1?'now':m<60?m+'m':m<1440?Math.round(m/60)+'h':Math.round(m/1440)+'d';};
+function keyForm(l){return `<div class="keybox"><p class="s">${esc(l.keyHelp||'This lens needs your own API key.')} It is stored encrypted and only ever sent to ${esc(l.keyHost)}.</p>
+  <div class="krow"><input class="t" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Paste your API key" data-keyin="${l.id}"><button class="pill solid" data-keysave="${l.id}">Save</button></div></div>`;}
+function customLens(l,preview){const noKey=l.needsKey&&!l.hasKey;
+  let h=`<div class="ln-title">${esc(l.note||l.summary||l.name)}</div>`;
+  if(noKey)h+=keyForm(l);
+  if(l.items.length)h+=l.items.map(x=>`<button class="rowi link" data-url="${esc(x.url)}"><div class="tm">${esc(agoTxt(x.when))}</div><div class="b"><div>${esc(x.title)}</div><div class="s">${esc(x.src||'')}</div></div></button>`).join('');
+  else if(!noKey)h+=`<p class="empty">${esc(l.error||'Nothing new right now.')}</p>`;
+  if(l.error&&l.items.length)h+=`<p class="empty">Last check: ${esc(l.error)}. Showing the last headlines.</p>`;
+  if(!preview)h+=`<div class="grid2"><button class="pill" data-lchange="${l.id}">Change</button><button class="pill" data-lrefresh="${l.id}">Refresh</button></div>`;
+  return {html:h,n:l.items.length||1,crit:false};}
+function putCustom(l){useCustom((D.custom||[]).filter(x=>x.id!==l.id).concat(l).sort((a,b)=>a.id-b.id));}
+function designer(l,text){D.dz={id:l?l.id:null,busy:false};
+  sheet(`<h2>${l?'Change '+esc(l.name):'New lens'}</h2>
+   <p class="muted" style="margin:0">${l?'Say what to change. For example: only Kent stories, show ten, or add Sky News.':'Describe what it should watch: a news topic, a website, or an API. If it needs your own key, you can paste it after.'}</p>
+   <textarea class="t" id="dzq" rows="3" placeholder="${l?'Only show court cases':'BBC news headlines about police and law'}"></textarea>
+   ${l?'':`<div class="chips">${EXAMPLES.map(x=>`<button class="chip" data-dzex="${esc(x)}">${esc(x)}</button>`).join('')}</div>`}
+   <div class="grid2"><button class="pill solid" id="dzgo">${l?'Change it':'Build it'}</button>${l?`<button class="pill" data-ldel="${l.id}">Delete lens</button>`:''}</div>
+   <div id="dzout"></div>`);
+  const q=$('#dzq');if(text){q.value=text;dzRun();}else setTimeout(()=>q.focus(),350);}
+async function dzRun(){const q=$('#dzq');const t=(q&&q.value||'').trim();if(!t){toast('Describe the lens first');return;}if(D.dz.busy)return;
+  D.dz.busy=true;$('#dzgo').disabled=true;q.blur();haptic();
+  $('#dzout').innerHTML='<p class="agent" style="margin-top:14px">Designing it, then testing it on the real site. This can take up to a minute.</p><div class="skel"></div><div class="skel" style="width:70%"></div><div class="skel" style="width:85%"></div>';
+  if(window.Env)Env.thinkGoal=1;
+  const was=D.dz.id;const r=await api('POST','/api/lenses',{op:'design',text:t,id:D.dz.id});
+  if(window.Env)Env.thinkGoal=0;D.dz.busy=false;const go=$('#dzgo');if(go)go.disabled=false;
+  if(!$('#dzout'))return;
+  if(!r.ok){$('#dzout').innerHTML=`<p class="empty" style="margin-top:12px">${esc(r.json.error||'Could not build that. Try again.')}</p>`;return;}
+  const l=r.json.lens;D.dz.id=l.id;learn('custom',was?'changed':'made');putCustom(l);lensesDraw();
+  dzShow(l,(r.json.reply||'Done.')+(r.json.repaired?'\n\nMy first design found nothing when I tested it, so I fixed it and tested again.':''));
+  const ch=$('#sheet .chips');if(ch)ch.remove();
+  q.value='';q.placeholder='Want it different? Say what to change';go.textContent='Change it';}
+function dzShow(l,msg){const o=$('#dzout');if(!o)return;
+  o.innerHTML=`${msg?`<div class="m c" style="max-width:100%;margin-top:14px">${esc(msg)}</div>`:''}
+    <div class="dzprev card"><div class="lh"><span class="dot" style="background:${l.color};color:${l.color}"></span><span class="k">${esc(l.name)}</span></div><div class="lb">${customLens(l,true).html}</div></div>
+    <p class="muted" style="font-size:13px;margin:0 0 10px">Reads ${l.sources.map(s=>esc(s.host)).join(', ')}, every ${l.refresh>=60?Math.round(l.refresh/60)+' h':l.refresh+' min'}${l.include.length?'. Keeps items mentioning '+esc(l.include.slice(0,6).join(', '))+(l.include.length>6?'…':''):''}${l.judgement?'. Then Claude checks: '+esc(l.judgement):''}</p>
+    <div class="grid2"><button class="pill solid" data-dzdone="${l.id}">Looks good</button></div>`;}
+async function customRefresh(id,fresh){const r=await api('POST','/api/lenses',id?{op:'refresh',id,fresh:!!fresh}:{op:'refresh'});
+  if(r.ok&&r.json.lenses){useCustom(r.json.lenses);if(!drag)lensesDraw();}return r;}
+
 let shown={};
 function lensesDraw(){const p=prefs();shown={};let h='';const src=[];
-  for(const k of p.order){if(p.off.has(k))continue;let r=null;try{r=R[k]();}catch(e){console.error(k,e);}if(r==null)continue;shown[k]=r;
+  for(const k of p.order){if(p.off.has(k)||!R[k]||!LENSES[k])continue;let r=null;try{r=R[k]();}catch(e){console.error(k,e);}if(r==null)continue;shown[k]=r;
     src.push({id:k,n:r.n||1,crit:!!r.crit});
     h+=`<section class="lens card reveal${r.crit?' alert':''}" data-k="${k}"><div class="lh"><span class="dot" style="background:${LENSES[k].dot};color:${LENSES[k].dot}"></span><span class="k">${esc(LENSES[k].name)}</span><span class="grip" aria-hidden="true">⋮⋮</span></div><div class="lb">${r.html}</div></section>`;}
   $('#lenses').innerHTML=h||'<p class="empty" style="text-align:center">Every lens is quiet. Nothing needs you.</p>';
@@ -328,10 +383,11 @@ function context(){const now=new Date(),sh=[],sd=[];for(let i=0;i<3;i++){const d
   const p=prefs();return {shifts:sh,shiftsData:sd,trips,lenses:p.order.filter(k=>!p.off.has(k))};}
 let loading=false;
 async function load(fresh){if(loading)return;loading=true;
-  const [f,l,v,c]=await Promise.all([api('GET','/api/google/feed'),api('GET','/api/lists'),api('GET','/api/voice'),api('GET','/api/conductor')]);
+  const [f,l,v,c,cl]=await Promise.all([api('GET','/api/google/feed'),api('GET','/api/lists'),api('GET','/api/voice'),api('GET','/api/conductor'),api('GET','/api/lenses')]);
+  if(cl.ok)useCustom(cl.json.lenses);
   if(f.ok){D.feed=f.json;D.feedErr='';}else if(f.code&&f.code!==401)D.feedErr=f.json.error||'Google is not answering';
   if(l.ok)D.lists=l.json;if(v.ok)D.voice=v.json;if(c.ok){D.links=c.json.links||D.links;if(c.json.brief&&!D.brief)D.brief=c.json.brief;}
-  render();loading=false;brief(fresh);}
+  render();loading=false;brief(fresh);if(cl.ok&&cl.json.lenses.length)customRefresh(0);}
 async function brief(fresh){if(D.briefBusy)return;D.briefBusy=true;heroDraw();
   const r=await api('POST','/api/conductor',{op:'brief',fresh:!!fresh,context:context()});D.briefBusy=false;
   if(r.ok&&r.json.headline){D.brief=r.json;if(r.json.links)D.links=r.json.links;render();}else heroDraw();}
@@ -353,6 +409,20 @@ document.addEventListener('click',async e=>{const b=e.target.closest('button,[da
   if(b.dataset.dir){learn('out','directions');N.openUrl('https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent(b.dataset.dir));return;}
   if(b.dataset.va){const row=b.closest('[data-vn]');$$('button',row).forEach(x=>x.disabled=true);const r=await api('POST','/api/voice/act',{id:Number(row.dataset.vn),action:b.dataset.va});
     if(r.ok){learn('voice',b.dataset.va);toast(b.dataset.va==='dismiss'?'Dismissed':'Done');load();}else{$$('button',row).forEach(x=>x.disabled=false);toast(esc(r.json.error||'Could not do that'));}return;}
+  if(b.id==='newLens'){learn('custom','new');designer(null);return;}
+  if(b.dataset.url!=null){learn('custom','open');if(b.dataset.url)N.openUrl(b.dataset.url);return;}
+  if(b.dataset.lchange){const l=(D.custom||[]).find(x=>x.id===+b.dataset.lchange);if(l){designer(l);dzShow(l,'');}return;}
+  if(b.dataset.lrefresh){b.disabled=true;b.textContent='Looking…';const r=await customRefresh(+b.dataset.lrefresh,true);if(!r.ok){b.disabled=false;b.textContent='Refresh';toast(esc(r.json.error||'Could not refresh'));}return;}
+  if(b.dataset.keysave){const id=+b.dataset.keysave,inp=$(`[data-keyin="${id}"]`),v=(inp&&inp.value||'').trim();if(!v){toast('Paste the key first');return;}
+    b.disabled=true;const r=await api('POST','/api/lenses',{op:'key',id,value:v});b.disabled=false;
+    if(r.ok){inp.value='';putCustom(r.json.lens);lensesDraw();if($('#dzout')&&D.dz&&D.dz.id===id)dzShow(r.json.lens,'Key saved. '+(r.json.lens.items.length?'Here is what it found.':(r.json.lens.error||'Nothing found yet.')));toast('Key saved and encrypted');}
+    else toast(esc(r.json.error||'Could not save the key'));return;}
+  if(b.dataset.dzex){const q=$('#dzq');if(q){q.value=b.dataset.dzex;if(/I name/.test(q.value)){q.value='New posts on ';q.focus();}else dzRun();}return;}
+  if(b.id==='dzgo'){dzRun();return;}
+  if(b.dataset.dzdone){closeSheet();const k='c'+b.dataset.dzdone;const p=prefs();if(p.off.has(k)){p.off.delete(k);try{N.setLensPrefs(JSON.stringify({order:p.order,off:[...p.off]}));}catch(e){}lensesDraw();}
+    setTimeout(()=>{const t=$(`[data-k="${k}"]`);if(t){t.classList.add('in');t.scrollIntoView({behavior:'smooth',block:'center'});}},250);toast('Added to Home. Hold it to move it.');return;}
+  if(b.dataset.ldel){if(!b.dataset.sure){b.dataset.sure='1';b.textContent='Tap again to delete';return;}
+    const id=+b.dataset.ldel;const r=await api('POST','/api/lenses',{op:'delete',id});if(r.ok){useCustom((D.custom||[]).filter(x=>x.id!==id));closeSheet();lensesDraw();toast('Lens deleted');}else toast('Could not delete it');return;}
   if(b.dataset.web){N.open('site');return;}
   if(b.id==='lensesBtn'){N.open('settings');return;}
   if(b.dataset.share){const x=D.brief.ideas[+b.dataset.share];learn('conductor','share_draft');N.share('draft.txt','text/plain',x.draft);return;}
@@ -394,6 +464,7 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-act]
   else if(a.type==='remember'){const r=await api('POST','/api/conductor',{op:'remember',text:a.text||a.label});toast(r.ok?'Conductor will remember that.':esc(r.json.error||'Could not save'));}
   else if(a.type==='draft_email'){N.openUrl('https://mail.google.com/mail/?view=cm&fs=1&to='+encodeURIComponent(a.to||'')+'&su='+encodeURIComponent(a.subject||'')+'&body='+encodeURIComponent(a.body||''));}
   else if(a.type==='join'&&a.url){N.openUrl(a.url);}
+  else if(a.type==='make_lens'){closeSheet();setTimeout(()=>designer(null,a.text||a.label),300);}
   else if(a.type==='open_lens'){closeSheet();const t=$(`[data-k="${a.lens}"]`);if(t){t.classList.add('in');t.scrollIntoView({behavior:'smooth',block:'center'});}else if(a.lens==='lists')N.open('lists');}
   learn('conductor','action_'+a.type);});
 $('#cmd').addEventListener('submit',e=>{e.preventDefault();const q=$('#q');const t=q.value;q.value='';q.blur();ask(t,false);});
@@ -403,7 +474,7 @@ mic.addEventListener('touchend',e=>{e.preventDefault();N&&N.micStop&&N.micStop()
 mic.addEventListener('touchcancel',()=>{N&&N.micStop&&N.micStop();});
 window.onMicState=(state,detail)=>{mic.classList.toggle('rec',state==='listening');$('#micnote').textContent=detail||'';if(window.Env)Env.thinkGoal=state==='listening'||state==='thinking'?1:0;
   if(state!=='listening'&&state!=='thinking')setTimeout(()=>{$('#micnote').textContent='';},4000);};
-window.onMicText=t=>{$('#micnote').textContent='';if(t)ask(t,true);else toast('No speech heard. Hold the mic and speak.');};
+window.onMicText=t=>{$('#micnote').textContent='';const dz=$('#sheet.on #dzq');if(t&&dz){dz.value=t;dzRun();return;}if(t)ask(t,true);else toast('No speech heard. Hold the mic and speak.');};
 
 function fitDock(){document.documentElement.style.setProperty('--dock',(innerHeight-$('#dock').getBoundingClientRect().top)+'px');}
 addEventListener('resize',fitDock);
@@ -411,7 +482,7 @@ addEventListener('scroll',()=>{$('#bar').classList.toggle('solid',scrollY>innerH
 window.onNativeShow=()=>load(false);
 window.onNativeReselect=()=>{window.scrollTo({top:0,behavior:'smooth'});load(true);};
 window.onNativeChange=()=>{if(!drag&&!document.querySelector('.lift'))lensesDraw();};
-D.feed=cached('feed');D.lists=cached('lists');D.voice=cached('voice');D.brief=cached('brief');if(D.brief&&D.brief.links)D.links=D.brief.links;
+useCustom((cached('lenses')||{}).lenses);D.feed=cached('feed');D.lists=cached('lists');D.voice=cached('voice');D.brief=cached('brief');if(D.brief&&D.brief.links)D.links=D.brief.links;
 render();fitDock();load(false);
 setInterval(()=>{if(document.visibilityState!=='visible')return;$('#clock').textContent=hhmm(new Date());
   if(D.brief&&D.brief.validUntil&&Date.now()>Date.parse(D.brief.validUntil)&&!D.briefBusy)brief(false);},30000);
