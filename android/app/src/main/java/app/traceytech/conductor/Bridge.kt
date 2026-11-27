@@ -29,7 +29,8 @@ class Bridge(private val a: MainActivity) {
         if (!ok || method !in setOf("GET", "POST")) { reply(id, 400, "{\"error\":\"Not allowed\"}"); return }
         io.execute {
             val r = if (method == "GET") Net.get(path)
-            else Net.call("POST", path, (body ?: "{}").toByteArray(), "application/json")
+            else Net.call("POST", path, (body ?: "{}").toByteArray(), "application/json",
+                timeoutMs = if (path == "/api/conductor") 120000 else 30000)  // Conductor thinks twice before it answers
             if (r.signedOut) main.post { Notifier.signIn(a) }
             if (r.ok && method == "GET") when (path) {
                 "/api/lists" -> Cache.put(a, "lists", r.body)
@@ -59,6 +60,10 @@ class Bridge(private val a: MainActivity) {
         Prefs.of(a).edit().putString(Prefs.LENSES, json).apply()
         changed()
     }
+
+    /** Reads Conductor's answer aloud (only when the question was spoken). */
+    @JavascriptInterface fun speak(text: String) = main.post { a.speak(text.take(1500)) }.let {}
+    @JavascriptInterface fun stopSpeaking() = main.post { a.speak(null) }.let {}
 
     /** Hold-to-talk on the Conductor chat bar. Answers come back as onMicState(state, detail) and onMicText(text). */
     @JavascriptInterface fun micStart() = main.post { a.conductorMic(true) }.let {}

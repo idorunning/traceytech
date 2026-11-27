@@ -154,9 +154,12 @@ class MainActivity : ComponentActivity() {
         pausedAt = System.currentTimeMillis()
         if (::mic.isInitialized) mic.stop()
         condMic?.stop()
+        tts?.stop()
         FobService.listener = null
         CookieManager.getInstance().flush()
     }
+
+    override fun onDestroy() { tts?.shutdown(); tts = null; super.onDestroy() }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
@@ -307,6 +310,19 @@ class MainActivity : ComponentActivity() {
         }
         window.decorView.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
         m.start()
+    }
+
+    private var tts: android.speech.tts.TextToSpeech? = null
+    private var ttsReady = false
+    /** Speak Conductor's answer, or stop speaking when text is null. */
+    fun speak(text: String?) {
+        if (text == null) { tts?.stop(); return }
+        val say = { tts?.speak(text, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "conductor") }
+        if (tts != null && ttsReady) { say(); return }
+        tts = android.speech.tts.TextToSpeech(this) { st ->
+            ttsReady = st == android.speech.tts.TextToSpeech.SUCCESS
+            if (ttsReady) { tts?.language = java.util.Locale.UK; say() }
+        }
     }
 
     private fun reselect() {
