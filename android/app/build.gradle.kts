@@ -6,9 +6,9 @@ plugins {
 }
 
 // The upload key stays on Nathan's computer. keystore.properties (never committed) says where it is:
-//   storeFile=C:/Users/user/OneDrive/Desktop/noteai/conductor-io-upload.jks
+//   storeFile=C:/path/to/NoteAi-upload.p12   (the same upload key as the old NoteAI app)
 //   storePassword=...
-//   keyAlias=upload
+//   keyAlias=noteai-upload
 //   keyPassword=...
 val keyProps = Properties().apply {
     val f = rootProject.file("keystore.properties")
@@ -20,10 +20,10 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "app.traceytech.conductor"
+        applicationId = "uk.co.noteai.app"
         minSdk = 33
         targetSdk = 36
-        versionCode = 1
+        versionCode = 100
         versionName = "1.0.0"
     }
 

@@ -1,6 +1,6 @@
 # Conductor IO (Android)
 
-The TraceyTech app for Android, package `app.traceytech.conductor`.
+The TraceyTech app for Android, package `uk.co.noteai.app` (it replaces the old NoteAI app on Play).
 
 - **Home** and **Voice** show traceytech.app itself, so everything the web app does works here.
 - **Lists**: multiple to-do lists. Uses `/api/lists` (worker/lists.js) when the Worker has it, otherwise keeps custom lists on the phone.
@@ -20,9 +20,9 @@ Needs JDK 17+ and the Android SDK (platform 36).
 Release builds are signed when `android/keystore.properties` exists (never commit it):
 
 ```
-storeFile=C:/path/to/conductor-io-upload.jks
+storeFile=C:/path/to/NoteAi-upload.p12
 storePassword=...
-keyAlias=upload
+keyAlias=noteai-upload
 keyPassword=...
 ```
 
