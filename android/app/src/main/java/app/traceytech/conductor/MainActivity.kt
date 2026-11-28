@@ -460,6 +460,7 @@ class MainActivity : ComponentActivity() {
             "notifications" -> if (!has(Manifest.permission.POST_NOTIFICATIONS)) permLauncher.launch(arrayOf(Manifest.permission.POST_NOTIFICATIONS)) else appSettings()
             "nearby" -> if (!FobService.hasPerms(this)) permLauncher.launch(arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT)) else appSettings()
             "location" -> if (!has(Manifest.permission.ACCESS_FINE_LOCATION)) permLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)) else appSettings()
+            "whatsapp" -> startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
             "contacts" -> if (!has(Manifest.permission.READ_CONTACTS)) permLauncher.launch(arrayOf(Manifest.permission.READ_CONTACTS)) else appSettings()
             "alarms" -> startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:$packageName")))
             "battery" -> startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))

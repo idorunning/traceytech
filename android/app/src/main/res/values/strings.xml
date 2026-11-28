@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">Conductor IO</string>
+    <string name="wa_sender_desc">Sends WhatsApp messages you dictate to the Conductor IO voice pin, without you touching the phone. It only looks at WhatsApp, and only while a message from the pin is waiting to go.</string>
+    <string name="wa_sender_label">Conductor IO: WhatsApp auto-send</string>
 </resources>

@@ -125,6 +125,12 @@ class FobService : Service() {
         super.onCreate()
         running = true
         registerReceiver(btState, IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED))
+        WaSender.onResult = { name, sent, waiting -> h.post {
+            val n = name.substringBefore(' ')
+            when { sent -> { fobText("Sent to $n", "WhatsApp"); set("Connected", "WhatsApp sent to $name.") }
+                waiting -> { fobText("Unlock phone to send", "WhatsApp to $n waits"); set("Connected", "WhatsApp to $name goes as soon as you unlock the phone.") }
+                else -> { fobText("Not sent to $n", "Tap the alert on your phone"); set("Connected", "WhatsApp to $name couldn't send by itself: tap the alert.") } }
+            note() } }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -312,8 +318,6 @@ class FobService : Service() {
 
     private fun onPkt(p: ByteArray) {
         if (p.size == 9 && tag(p) == "NAQ1") { val id = u32(p, 4); val ch = p[8].toInt() and 1
-            waAsk.remove(id)?.let { (opts, text) -> val w = opts[ch]; Wa.notify(this, w.name, w.number, text)
-                fobText("WhatsApp to " + w.name.substringBefore(' '), "Tap Send on your phone"); status(true); set("Connected", "WhatsApp to ${w.name} is ready: tap the alert, then Send."); note(); return }
             answer(id, ch); return }
         if (p.size == 12 && tag(p) == "NAS1") {
             val total = u32(p, 4).toInt()
@@ -367,8 +371,6 @@ class FobService : Service() {
         return false
     }
     // ---- WhatsApp: "message Sam I'm running late" (the server replies with whatsapp:{to,text,phone?}) ----
-    private val waAsk = HashMap<Long, Pair<List<Wa.Who>, String>>()
-    private var waSeq = 0L
     /** Returns true when the result was a WhatsApp message (it then handles the fob screen and status itself). */
     private fun whatsapp(j: org.json.JSONObject): Boolean {
         val wa = j.optJSONObject("whatsapp") ?: return false
@@ -377,14 +379,16 @@ class FobService : Service() {
         val phone = wa.optString("phone").trim().ifEmpty { null }
         val found = if (phone != null) listOf(Wa.Who(to.ifEmpty { phone }, phone)) else Wa.find(this, to)
         val first = to.substringBefore(' ').ifEmpty { "them" }
+        val w = found.firstOrNull()  // a slight mix-up is fine for personal chats: take the best match
         when {
-            found.size == 1 -> { Wa.notify(this, found[0].name, found[0].number, text); fobText("WhatsApp to " + found[0].name.substringBefore(' '), "Tap Send on your phone"); status(true) }
-            found.size == 2 -> { val id = 0x80000000L or (++waSeq and 0x7fffffffL); waAsk[id] = found to text
-                fobAsk(id, "WhatsApp which $first?", found[0].name, found[1].name) }
+            w != null && WaSender.on() -> { WaSender.send(this, w, text); fobText("Sending to " + w.name.substringBefore(' '), text.take(60)); status(true)
+                set("Connected", "Sending WhatsApp to ${w.name}…") }
+            w != null -> { Wa.notify(this, w.name, w.number, text); fobText("WhatsApp to " + w.name.substringBefore(' '), "Tap Send on your phone"); status(true)
+                set("Connected", "WhatsApp to ${w.name} is ready: tap the alert, then Send. Turn on auto-send in Settings to skip this.") }
             else -> { Wa.notify(this, to.ifEmpty { "a chat" }, null, text)
-                fobText("WhatsApp: pick $first", if (!Wa.canRead(this)) "Allow Contacts in app Settings" else "Tap the alert on your phone"); status(true) }
+                fobText("No contact $first", if (!Wa.canRead(this)) "Allow Contacts in app Settings" else "Pick the chat on your phone"); status(false)
+                set("Connected", "No contact called $to: tap the alert to pick the chat.") }
         }
-        set("Connected", "WhatsApp to ${to.ifEmpty { "someone" }} is ready: tap the alert, then Send.")
         return true
     }
 
