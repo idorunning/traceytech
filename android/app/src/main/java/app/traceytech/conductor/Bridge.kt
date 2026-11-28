@@ -84,6 +84,7 @@ class Bridge(private val a: MainActivity) {
                 .put("notifications", a.has(Manifest.permission.POST_NOTIFICATIONS))
                 .put("nearby", FobService.hasPerms(a))
                 .put("location", a.has(Manifest.permission.ACCESS_FINE_LOCATION) || a.has(Manifest.permission.ACCESS_COARSE_LOCATION))
+                .put("contacts", a.has(Manifest.permission.READ_CONTACTS))
                 .put("alarms", am.canScheduleExactAlarms())
                 .put("battery", pm.isIgnoringBatteryOptimizations(a.packageName)))
             .put("fob", JSONObject()

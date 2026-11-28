@@ -311,7 +311,10 @@ class FobService : Service() {
     private val idle = Runnable { if (rx != null) ack() }
 
     private fun onPkt(p: ByteArray) {
-        if (p.size == 9 && tag(p) == "NAQ1") { answer(u32(p, 4), p[8].toInt() and 1); return }
+        if (p.size == 9 && tag(p) == "NAQ1") { val id = u32(p, 4); val ch = p[8].toInt() and 1
+            waAsk.remove(id)?.let { (opts, text) -> val w = opts[ch]; Wa.notify(this, w.name, w.number, text)
+                fobText("WhatsApp to " + w.name.substringBefore(' '), "Tap Send on your phone"); status(true); set("Connected", "WhatsApp to ${w.name} is ready: tap the alert, then Send."); note(); return }
+            answer(id, ch); return }
         if (p.size == 12 && tag(p) == "NAS1") {
             val total = u32(p, 4).toInt()
             if (total <= 0 || total > 48000 * 2 * 65) return
@@ -363,6 +366,28 @@ class FobService : Service() {
         j.optJSONObject("fob")?.let { fobText(it.optString("head"), it.optString("line")) }
         return false
     }
+    // ---- WhatsApp: "message Sam I'm running late" (the server replies with whatsapp:{to,text,phone?}) ----
+    private val waAsk = HashMap<Long, Pair<List<Wa.Who>, String>>()
+    private var waSeq = 0L
+    /** Returns true when the result was a WhatsApp message (it then handles the fob screen and status itself). */
+    private fun whatsapp(j: org.json.JSONObject): Boolean {
+        val wa = j.optJSONObject("whatsapp") ?: return false
+        val to = wa.optString("to").trim(); val text = wa.optString("text").trim()
+        if (text.isEmpty()) return false
+        val phone = wa.optString("phone").trim().ifEmpty { null }
+        val found = if (phone != null) listOf(Wa.Who(to.ifEmpty { phone }, phone)) else Wa.find(this, to)
+        val first = to.substringBefore(' ').ifEmpty { "them" }
+        when {
+            found.size == 1 -> { Wa.notify(this, found[0].name, found[0].number, text); fobText("WhatsApp to " + found[0].name.substringBefore(' '), "Tap Send on your phone"); status(true) }
+            found.size == 2 -> { val id = 0x80000000L or (++waSeq and 0x7fffffffL); waAsk[id] = found to text
+                fobAsk(id, "WhatsApp which $first?", found[0].name, found[1].name) }
+            else -> { Wa.notify(this, to.ifEmpty { "a chat" }, null, text)
+                fobText("WhatsApp: pick $first", if (!Wa.canRead(this)) "Allow Contacts in app Settings" else "Tap the alert on your phone"); status(true) }
+        }
+        set("Connected", "WhatsApp to ${to.ifEmpty { "someone" }} is ready: tap the alert, then Send.")
+        return true
+    }
+
     private fun answer(id: Long, choice: Int) {
         wakeOn(); set("Thinking…", ""); note()
         io.execute {
@@ -371,8 +396,7 @@ class FobService : Service() {
             val j = res.json()
             h.post {
                 if (res.ok) {
-                    val asked = showResult(j)
-                    if (!asked) status(j.optBoolean("ok", true))
+                    if (!whatsapp(j)) { val asked = showResult(j); if (!asked) status(j.optBoolean("ok", true)) }
                     set("Connected", j.optString("message", "Saved"))
                     Notifier.voiceResult(this, true, lastHeard, j.optString("message")); Sync.now(this)
                 } else {
@@ -405,7 +429,7 @@ class FobService : Service() {
                     }
                     else -> {
                         val good = j.optBoolean("ok") && j.optString("state") != "unclear"
-                        if (!showResult(j)) status(good)
+                        if (!whatsapp(j) && !showResult(j)) status(good)
                         val said = j.optString("transcript")
                         lastHeard = said
                         set("Connected", (if (said.isNotEmpty()) "You said: “$said”. " else "") + j.optString("message"))
