@@ -286,9 +286,10 @@ class MainActivity : ComponentActivity() {
     }
 
     /** From the Conductor home: "Fix in TraceyTech" or Settings, "Open TraceyTech site". */
-    fun openSite() {
+    fun openSite(path: String = "/") {
         siteOpen = true
-        if (!loaded.contains("site")) { loaded.add("site"); home.loadUrl(SITE + "/") }
+        if (path != "/") { loaded.add("site"); home.loadUrl(SITE + path) }
+        else if (!loaded.contains("site")) { loaded.add("site"); home.loadUrl(SITE + "/") }
         show(TAB_HOME)
     }
 

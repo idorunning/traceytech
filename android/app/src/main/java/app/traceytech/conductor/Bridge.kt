@@ -132,7 +132,13 @@ class Bridge(private val a: MainActivity) {
 
     @JavascriptInterface fun syncNow() = Sync.now(a)
 
-    @JavascriptInterface fun open(tab: String) = main.post { if (tab == "site") a.openSite() else a.show(tab) }.let {}
+    @JavascriptInterface fun open(tab: String) = main.post {
+        when {
+            tab == "site" -> a.openSite()
+            tab.startsWith("site:/") && Regex("^site:/[a-z0-9/-]{0,60}$").matches(tab) -> a.openSite(tab.removePrefix("site:"))  // a page on traceytech.app
+            else -> a.show(tab)
+        }
+    }.let {}
 
     @JavascriptInterface
     fun signOut() {
