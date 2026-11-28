@@ -152,7 +152,7 @@ h1.speak .w{display:inline-block;opacity:0;filter:blur(10px);transform:translate
 <canvas id="env"></canvas><div class="vignette"></div>
 <div class="shell" id="shell">
   <header class="bar" id="bar"><div class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="6"/><rect x="8" y="8" width="8" height="8" rx="2.5" fill="currentColor"/></svg>Conductor</div>
-    <div class="bar-r"><span class="clock" id="clock"></span><button class="tag" id="lensesBtn">Lenses</button></div></header>
+    <div class="bar-r"><span class="clock" id="clock"></span><button class="tag" id="mapBtn" data-sitepage="/#map">Map</button><button class="tag" id="lensesBtn">Lenses</button></div></header>
   <section class="hero card" id="hero">
     <div class="who"><span class="ldot" id="ldot"></span><span id="live">Conductor</span></div>
     <h1 class="speak" id="speak"></h1>
@@ -479,7 +479,7 @@ document.addEventListener('click',async e=>{const b=e.target.closest('button,[da
   if(b.dataset.dir){learn('out','directions');N.openUrl('https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent(b.dataset.dir));return;}
   if(b.dataset.va){const row=b.closest('[data-vn]');$$('button',row).forEach(x=>x.disabled=true);const r=await api('POST','/api/voice/act',{id:Number(row.dataset.vn),action:b.dataset.va});
     if(r.ok){learn('voice',b.dataset.va);toast(b.dataset.va==='dismiss'?'Dismissed':'Done');load();}else{$$('button',row).forEach(x=>x.disabled=false);toast(esc(r.json.error||'Could not do that'));}return;}
-  if(b.dataset.sitepage){learn('seo','open');N.open('site:'+b.dataset.sitepage);return;}
+  if(b.dataset.sitepage){if(b.id!=='mapBtn')learn('seo','open');N.open('site:'+b.dataset.sitepage);return;}
   if(b.dataset.gscfresh){b.disabled=true;b.textContent='Looking…';const r=await api('GET','/api/search-console?fresh=1');if(r.ok){D.gsc=r.json;lensesDraw();}else{b.disabled=false;b.textContent='Refresh';toast(esc(r.json.error||'Search Console did not answer'));}return;}
   if(b.id==='newLens'){learn('custom','new');designer(null);return;}
   if(b.dataset.url!=null){learn('custom','open');if(b.dataset.url)N.openUrl(b.dataset.url);return;}

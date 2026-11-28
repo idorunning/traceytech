@@ -969,6 +969,7 @@ async function load(){
   S.ideas=ideas();S.graph=graphData();
   if(!sceneOn){sceneOn=true;initEnv();env.live=true;if(reduce||!$('env'))setInterval(()=>{const m=env.pick();if(m)env.onPulse(m);},4000);}
   env.setGraph(S.graph);if(document.body.classList.contains('map'))buildLabels();
+  if(!window.__hashMap&&location.hash==='#map'){window.__hashMap=1;openMap();}
   composeVoice();renderChain();renderDeck();renderIdeas();renderInbox();renderAhead();renderToday();renderPulse();renderSources();renderGoogle();renderLearned();
   renderPreviews();loadGoogle().then(loadFeed);loadGoat().then(()=>{renderLenses();refreshConns();});loadMaps().then(()=>{if(navigator.permissions&&navigator.permissions.query)navigator.permissions.query({name:'geolocation'}).then(p=>{if(p.state==='granted')getPos().then(()=>fetchRoute()).then(refreshMaps);}).catch(()=>{});else refreshMaps();});loadAnswers().then(()=>{if(S.clash)refreshClash();});if(!CS.loaded)loadConns().then(()=>{renderLenses();refreshConns();});
   if(/[?&]google=connected/.test(location.search)){history.replaceState(null,'','/');toast('<b>Google connected.</b> Open Plugged in and press Test every service.');}
