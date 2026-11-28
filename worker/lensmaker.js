@@ -10,7 +10,7 @@
       Anthropic key is used, so rotating that key means entering lens keys again.
    Route it next to conductorRoutes, behind the sign-in:
      {const lm=await lensRoutes(r,env,u);if(lm)return lm;}
-   Needs from the same bundle: json, sameOrigin, condAI, condClip (conductor.js). */
+   Needs from the same bundle: json, sameOrigin, condAI, condClip (conductor.js), gTables, gAccess (Google sign-in). */
 
 const LENS_COLORS=['#8ab4f8','#ffa657','#3fb950','#bc8cff','#58a6ff','#ff7eb6','#e3b341','#e5322b','#56d4dd','#efede8'];
 const LENS_MAX=20;
@@ -42,6 +42,7 @@ You turn his description into a design the server can run with no further help:
 - exclude: words that mark items to drop, usually [].
 - ai_filter: a one-sentence judgement for a second check when keywords are not enough (e.g. "Keep stories about policing, crime, courts and changes to the law in the UK; drop sport and celebrity gossip"). "" when keywords are enough.
 - max_items 3 to 12 (default 6). refresh_minutes 15 to 1440 (news 30, slow pages 360).
+- Google APIs on www.googleapis.com or searchconsole.googleapis.com (Search Console sites, sitemaps, searchAnalytics GET endpoints) are read with his connected Google sign-in automatically: set key.needed false for them. He also has a built-in Search Console lens with clicks, top searches and problems; mention it in reply when he asks for Search Console.
 - key: needed true only for an API that needs his own key; how = header (param = header name), bearer, or query (param = query parameter name); where_to_get = one sentence on where he gets the key. Never put a key in a URL. If he pasted a key in his message, copy it exactly into pasted_key, else "".
 - name: two or three words. color: pick one that suits it. summary: one sentence on what it shows.
 - reply: one or two sentences to Nathan saying what you built and anything he must do (for example paste a key). No promises the server cannot keep.`;
@@ -79,15 +80,24 @@ async function lensKeyGet(env,id){const r=await env.DB.prepare('SELECT host,iv,d
   catch{return {host:r.host,value:'',broken:true};}}
 const lensKeyHost=s=>{const x=s.sources.find(x=>x.kind==='json')||s.sources[0];try{return new URL(x.url).hostname.toLowerCase();}catch{return '';}};
 
-async function lensGet(src,spec,key){
+/* Google APIs (Search Console) use Nathan's connected Google sign-in, never a pasted key.
+   The token goes only to googleapis.com, read-only GETs, trying each connected account that has the scope. */
+const LENS_GOOGLE=/^(www|searchconsole)\.googleapis\.com$/;
+async function lensGoogleTokens(env){try{await gTables(env);const rows=(await env.DB.prepare('SELECT email,scopes FROM google_accts ORDER BY added').all()).results||[];const out=[];
+  for(const rw of rows){if(!String(rw.scopes||'').includes('webmasters'))continue;const a=await gAccess(env,rw.email);if(a&&a.token)out.push(a.token);}return out;}catch(e){return [];}}
+async function lensGet(src,spec,key,gtok){
   if(!lensUrlOk(src.url))return {error:'That address is not allowed'};
   const u=new URL(src.url),headers={'User-Agent':'ConductorIO-Lens/1.0 (+https://traceytech.app)','Accept':src.kind==='json'?'application/json':src.kind==='rss'?'application/rss+xml, application/atom+xml, application/xml, text/xml, */*':'text/html, */*'};
   let withKey=false;
-  if(spec.key.needed&&key&&key.value&&key.host===u.hostname.toLowerCase()){withKey=true;
+  if(spec.key.needed&&key&&key.value&&key.host===u.hostname.toLowerCase()&&!LENS_GOOGLE.test(u.hostname)){withKey=true;
     if(spec.key.how==='bearer')headers.Authorization='Bearer '+key.value;
     else if(spec.key.how==='header'&&spec.key.param)headers[spec.key.param]=key.value;
     else if(spec.key.how==='query'&&spec.key.param)u.searchParams.set(spec.key.param,key.value);}
-  let r;try{r=await fetch(u.toString(),{headers,redirect:withKey?'manual':'follow',signal:AbortSignal.timeout(9000),cf:{cacheTtl:300}});}
+  let r;try{
+    if(!withKey&&LENS_GOOGLE.test(u.hostname)&&gtok){const toks=await gtok();if(!toks.length)return {error:'Connect Google at traceytech.app (with Search Console allowed) so this lens can read it',auth:true};
+      for(const t of toks){r=await fetch(u.toString(),{headers:{...headers,Authorization:'Bearer '+t},redirect:'manual',signal:AbortSignal.timeout(9000)});if(r.status!==401&&r.status!==403)break;}
+      withKey=true;}
+    else r=await fetch(u.toString(),{headers,redirect:withKey?'manual':'follow',signal:AbortSignal.timeout(9000),cf:{cacheTtl:300}});}
   catch(e){return {error:'Could not reach '+u.hostname};}
   if(r.status>=300&&r.status<400)return {error:u.hostname+' redirected the request, so the key was not sent on'};
   if(r.status===401||r.status===403)return {error:u.hostname+' refused the request ('+r.status+')'+(spec.key.needed?(withKey?'. Check the key.':'. It needs your key.'):''),auth:true};
@@ -141,7 +151,8 @@ function lensFilter(items,spec){
 /* Run a lens: fetch every source, keep what matches, then let Claude make the final cut when the
    design asks for judgement. Returns what the card shows, plus problems for the repair pass. */
 async function lensRun(env,spec,key){
-  const res=await Promise.all(spec.sources.map(s=>lensGet(s,spec,key)));
+  let gp=null;const gtok=()=>gp||(gp=lensGoogleTokens(env));
+  const res=await Promise.all(spec.sources.map(s=>lensGet(s,spec,key,gtok)));
   const problems=[];let all=[];
   res.forEach((r,i)=>{const s=spec.sources[i];if(r.error)problems.push(`Source ${i+1} (${s.url}): ${r.error}`);
     else{if(!r.items.length)problems.push(`Source ${i+1} (${s.url}): read fine but had no items`);all=all.concat(r.items);}});
