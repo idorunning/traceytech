@@ -15,7 +15,32 @@ import android.provider.ContactsContract
  * Nothing is ever sent without that tap.
  */
 object Wa {
-    data class Who(val name: String, val number: String)
+    /** number is empty for a group chat: groups are picked by name in WhatsApp's own chat list. */
+    data class Who(val name: String, val number: String, val group: Boolean = false)
+
+    /** What Nathan says -> who it means. Edited in Settings > WhatsApp names. */
+    const val ALIASES = "wa_aliases"
+    const val DEFAULT_ALIASES = "[{\"say\":\"Mel\",\"to\":\"Mel Tracey\",\"group\":false},{\"say\":\"General chat\",\"to\":\"General chat\",\"group\":true},{\"say\":\"Liam\",\"to\":\"sigma lord\",\"group\":false},{\"say\":\"Abigail\",\"to\":\"Abigail\",\"group\":false},{\"say\":\"Lily\",\"to\":\"Lily\",\"group\":false}]"
+    fun aliases(c: Context): String = Prefs.of(c).getString(ALIASES, null) ?: DEFAULT_ALIASES
+    private fun norm(s: String) = s.lowercase().replace(Regex("[^a-z0-9 ]"), " ").replace(Regex("\\s+"), " ").trim()
+
+    /** Who to send to: an alias first (so "Liam" finds "sigma lord"), then the phone's contacts. */
+    fun resolve(c: Context, said: String): List<Who> {
+        val q = norm(said)
+        try {
+            val a = org.json.JSONArray(aliases(c))
+            for (k in 0 until a.length()) {
+                val o = a.optJSONObject(k) ?: continue
+                val say = norm(o.optString("say")); val to = o.optString("to").trim()
+                if (say.isEmpty() || to.isEmpty()) continue
+                if (q == say || q.startsWith("$say ") || q.endsWith(" $say") || (q.length >= 3 && say.startsWith(q))) {
+                    if (o.optBoolean("group")) return listOf(Who(to, "", true))
+                    val f = find(c, to); return f.ifEmpty { listOf() }
+                }
+            }
+        } catch (_: Exception) {}
+        return find(c, said)
+    }
 
     fun canRead(c: Context) = c.checkSelfPermission(Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED
 
@@ -60,6 +85,7 @@ object Wa {
 
     /** Opens the chat with the text typed in, or WhatsApp's own chat picker when there is no number. */
     fun intent(c: Context, number: String?, text: String): Intent {
+        @Suppress("NAME_SHADOWING") val number = number?.ifBlank { null }
         val p = pkg(c)
         val i = if (!number.isNullOrBlank())
             Intent(Intent.ACTION_VIEW, Uri.parse("https://api.whatsapp.com/send?phone=${intl(number)}&text=${Uri.encode(text)}"))
@@ -73,7 +99,7 @@ object Wa {
         if (!Notifier.allowed(c)) return
         val id = 7000 + (System.currentTimeMillis() % 900).toInt()
         val pi = PendingIntent.getActivity(c, id, intent(c, number, text), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
-        val title = if (number != null) "WhatsApp to $to" else "WhatsApp: choose $to"
+        val title = if (!number.isNullOrBlank()) "WhatsApp to $to" else "WhatsApp: choose $to"
         val b = Notification.Builder(c, Notif.CH_VOICE)
             .setSmallIcon(R.drawable.ic_stat).setColor(0xFF25D366.toInt())
             .setContentTitle(title)

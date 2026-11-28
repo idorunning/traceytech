@@ -377,7 +377,7 @@ class FobService : Service() {
         val to = wa.optString("to").trim(); val text = wa.optString("text").trim()
         if (text.isEmpty()) return false
         val phone = wa.optString("phone").trim().ifEmpty { null }
-        val found = if (phone != null) listOf(Wa.Who(to.ifEmpty { phone }, phone)) else Wa.find(this, to)
+        val found = if (phone != null) listOf(Wa.Who(to.ifEmpty { phone }, phone)) else Wa.resolve(this, to)
         val first = to.substringBefore(' ').ifEmpty { "them" }
         val w = found.firstOrNull()  // a slight mix-up is fine for personal chats: take the best match
         when {

@@ -10,6 +10,7 @@ main{padding:0 14px 40px}
 section{margin-bottom:14px;padding:4px 0}
 section h2{font:500 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.16em;text-transform:uppercase;color:var(--ash);margin:16px 16px 6px}
 .line{display:flex;align-items:center;gap:12px;padding:13px 16px;border-top:1px solid var(--line)}
+.line.wa{gap:8px;padding:10px 12px}.line.wa .pill{flex:0 0 auto;width:40px;min-width:0;padding:0}.line.wa input:not([type=checkbox]){flex:1;min-width:0;background:rgba(239,237,232,.06);border:1px solid var(--line);border-radius:10px;color:inherit;font:inherit;padding:8px 10px}
 .line:first-of-type{border-top:0}
 .line .l{flex:1;min-width:0}
 .line .s{font-size:13px;color:var(--ash);margin-top:2px}
@@ -57,6 +58,9 @@ function lensPrefs(){try{return JSON.parse(N.lensPrefs()||'{}');}catch(e){return
 async function loadMem(){const r=await api('GET','/api/conductor');if(r.ok){MEM=r.json.memory||[];MEMERR='';}else MEMERR=r.code===401?'Sign in to see what Conductor remembers.':(r.json.error||'Not available yet');render();}
 function sw(k,on){return `<label class="sw"><input type="checkbox" data-p="${k}"${on?' checked':''}><span></span></label>`;}
 function ago(t){if(!t)return 'Not yet';const m=Math.round((Date.now()-t)/6e4);if(m<1)return 'Just now';if(m<60)return m+' min ago';const h=Math.round(m/60);return h<24?h+' h ago':new Date(t).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});}
+function waRows(j){let a=[];try{a=JSON.parse(j||'[]');}catch(e){}
+  return a.map(o=>`<div class="line wa"><input class="wa-say" value="${esc(o.say)}" placeholder="You say" aria-label="You say"><span class="muted">→</span><input class="wa-to" value="${esc(o.to)}" placeholder="Contact or group" aria-label="Contact or group"><label class="muted" style="font-size:12px"><input type="checkbox" class="wa-g" ${o.group?'checked':''}> Group</label><button class="pill" data-wadel="1" aria-label="Remove">×</button></div>`).join('');}
+function waCollect(){return [...document.querySelectorAll('#waList .wa')].map(r=>({say:r.querySelector('.wa-say').value.trim(),to:r.querySelector('.wa-to').value.trim(),group:r.querySelector('.wa-g').checked})).filter(o=>o.say&&o.to);}
 function render(){
   if(!N){$('#main').innerHTML='<p class="muted">Open this inside Conductor IO.</p>';return;}
   const s=JSON.parse(N.state()),p=s.prefs,f=s.fob;
@@ -73,6 +77,11 @@ function render(){
   <section class="card"><h2>Voice fob</h2>
     <div class="line"><span class="dot ${f.connected?'on':f.on?'busy':''}"></span><div class="l"><div>${esc(f.status)}</div><div class="s">${esc(f.detail)}</div></div></div>
     <div class="btns"><button class="pill solid" data-fob="toggle">${f.on?'Disconnect':'Connect fob'}</button>${f.known?'<button class="pill" data-fob="forget">Forget fob</button>':''}<button class="pill" data-fob="open">Voice notes</button></div>
+  </section>
+  <section class="card"><h2>WhatsApp names</h2>
+    <p class="muted" style="margin:0 0 8px">What you say to the pin, and who it means. Tick Group for a group chat.</p>
+    <div id="waList">${waRows(s.waAliases)}</div>
+    <div class="btns"><button class="pill" id="waAdd">Add a name</button><button class="pill solid" id="waSave">Save</button></div>
   </section>
   <section class="card"><h2>Notifications</h2>
     <div class="line"><div class="l">To-do reminders<div class="s">When a to-do is due</div></div>${sw('n_remind',p.n_remind)}</div>
@@ -102,6 +111,9 @@ document.addEventListener('change',e=>{const L=e.target.dataset.lens;
   if(L){const p=lensPrefs();const off=new Set(p.off||[]);if(e.target.checked)off.delete(L);else off.add(L);N.setLensPrefs(JSON.stringify({order:p.order||[],off:[...off]}));haptic();return;}
   const k=e.target.dataset.p;if(!k)return;N.setPref(k,e.target.type==='checkbox'?String(e.target.checked):e.target.value);haptic();});
 document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+  if(b.id==='waAdd'){$('#waList').insertAdjacentHTML('beforeend',waRows(JSON.stringify([{say:'',to:'',group:false}])));return;}
+  if(b.id==='waSave'){N.setPref('wa_aliases',JSON.stringify(waCollect()));haptic();toast('Saved');return;}
+  if(b.dataset.wadel){b.closest('.wa').remove();return;}
   if(b.dataset.perm)N.permission(b.dataset.perm);
   else if(b.dataset.fob)N.fob(b.dataset.fob);
   else if(b.dataset.tab)N.open(b.dataset.tab);

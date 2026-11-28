@@ -34,6 +34,7 @@ class WaSender : AccessibilityService() {
 
     private val h = Handler(Looper.getMainLooper())
     private var armed: Job? = null
+    private var picked = false
     private var pkg = "com.whatsapp"
     private val unlocked = object : BroadcastReceiver() { override fun onReceive(c: Context, i: Intent) { kick() } }
     private val timeout = Runnable { val j = armed ?: return@Runnable; armed = null; fail(j) }
@@ -61,7 +62,7 @@ class WaSender : AccessibilityService() {
         synchronized(queue) { queue.removeFirst() }
         val i = Wa.intent(this, j.who.number, j.text)
         pkg = i.`package` ?: "com.whatsapp"
-        armed = j
+        armed = j; picked = false
         h.postDelayed(timeout, 15000)
         try { startActivity(i) } catch (e: Exception) { h.removeCallbacks(timeout); armed = null; fail(j) }
     }
@@ -70,12 +71,29 @@ class WaSender : AccessibilityService() {
         val j = armed ?: return
         if (e.packageName?.toString()?.startsWith("com.whatsapp") != true) return
         val root = rootInActiveWindow ?: return
+        if (j.who.group) {
+            // a group has no number: WhatsApp's chat list opens with the text ready; tap the group, then Send
+            val send = root.findAccessibilityNodeInfosByViewId("$pkg:id/send").firstOrNull()
+            if (picked && send != null) { press(j, send); return }
+            if (!picked) {
+                val hit = root.findAccessibilityNodeInfosByText(j.who.name).firstOrNull { (it.text?.toString() ?: "").trim().equals(j.who.name.trim(), true) }
+                    ?: return
+                var n: AccessibilityNodeInfo? = hit
+                while (n != null && !n.isClickable) n = n.parent
+                if (n?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true) picked = true
+            }
+            return
+        }
         val entry = root.findAccessibilityNodeInfosByViewId("$pkg:id/entry").firstOrNull()
         val typed = entry?.text?.toString().orEmpty()
         if (typed.isEmpty() || !typed.trim().startsWith(j.text.trim().take(12))) return  // not our chat yet
         val send = root.findAccessibilityNodeInfosByViewId("$pkg:id/send").firstOrNull()
             ?: root.findAccessibilityNodeInfosByText("Send").firstOrNull { it.isClickable }
             ?: return
+        press(j, send)
+    }
+
+    private fun press(j: Job, send: AccessibilityNodeInfo) {
         armed = null; h.removeCallbacks(timeout)
         val ok = send.performAction(AccessibilityNodeInfo.ACTION_CLICK)
         if (!ok) { fail(j); return }

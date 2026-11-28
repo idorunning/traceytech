@@ -94,6 +94,7 @@ class Bridge(private val a: MainActivity) {
                 .put("status", FobService.status)
                 .put("detail", FobService.detail)
                 .put("known", p.getString(Prefs.FOB_ADDR, null) != null))
+            .put("waAliases", Wa.aliases(a))
             .put("prefs", JSONObject()
                 .put(Prefs.SYNC_MIN, p.getInt(Prefs.SYNC_MIN, 15))
                 .put(Prefs.N_REMIND, p.getBoolean(Prefs.N_REMIND, true))
@@ -114,6 +115,11 @@ class Bridge(private val a: MainActivity) {
             Prefs.SYNC_MIN -> { e.putInt(key, value.toIntOrNull()?.coerceIn(15, 240) ?: 15).apply(); Sync.schedule(a, true); return }
             Prefs.N_CAL_LEAD -> e.putInt(key, value.toIntOrNull()?.coerceIn(0, 120) ?: 10)
             Prefs.N_REMIND, Prefs.N_CAL, Prefs.N_VOICE, Prefs.N_MAIL, Prefs.N_INVITE -> e.putBoolean(key, value == "true")
+            Wa.ALIASES -> e.putString(key, try { val arr = org.json.JSONArray(value); val out = org.json.JSONArray()
+                for (k in 0 until minOf(arr.length(), 40)) { val o = arr.optJSONObject(k) ?: continue
+                    val say = o.optString("say").trim().take(40); val to = o.optString("to").trim().take(60)
+                    if (say.isNotEmpty() && to.isNotEmpty()) out.put(org.json.JSONObject().put("say", say).put("to", to).put("group", o.optBoolean("group"))) }
+                out.toString() } catch (_: Exception) { return })
             else -> return
         }
         e.apply()
