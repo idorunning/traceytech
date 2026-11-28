@@ -40,6 +40,9 @@ import java.util.zip.CRC32
  * Same protocol as traceytech.app/voice and noteai_bridge v4+:
  *  - notify on AUD: "NAS1" u32 total u32 rate | data: u32 offset, u8 flags (bit0 = end of window), bytes | "NAE1" u32 total u32 crc32
  *  - write on CTL: 0x01 [mtu lo, hi] ready, 0x00 stop, 0x02 u32 received (ack), 0x03 ok/fail status (then 0x01 again)
+ *  - firmware 0.5.2+: 0x04 "headline\nmore" shows text on the fob; 0x05 u32 id "question\nA\nB" asks a two-choice
+ *    question (FRONT = A, SIDE = B). Each is followed by 0x01 because older firmware treats other writes as stop.
+ *    The answer comes back as a notify on AUD: "NAQ1" u32 id u8 choice (0 = A, 1 = B), even with no transfer running.
  */
 @SuppressLint("MissingPermission") // every entry point checks BLUETOOTH_CONNECT / BLUETOOTH_SCAN first
 class FobService : Service() {
@@ -308,6 +311,7 @@ class FobService : Service() {
     private val idle = Runnable { if (rx != null) ack() }
 
     private fun onPkt(p: ByteArray) {
+        if (p.size == 9 && tag(p) == "NAQ1") { answer(u32(p, 4), p[8].toInt() and 1); return }
         if (p.size == 12 && tag(p) == "NAS1") {
             val total = u32(p, 4).toInt()
             if (total <= 0 || total > 48000 * 2 * 65) return
@@ -338,6 +342,48 @@ class FobService : Service() {
 
     private fun status(ok: Boolean) { write(byteArrayOf(3, if (ok) 1 else 0)); write(byteArrayOf(1)) }
 
+    // ---- the fob's screen (firmware 0.5.2+; older firmware ignores these) ----
+
+    private fun ascii(t: String) = t.map { if (it == '\n' || it.code in 32..126) it else when (it) { '‘', '’' -> '\''; '“', '”' -> '"'; '–', '—' -> '-'; '…' -> '.'; else -> '?' } }.joinToString("")
+    private fun fobText(head: String, line: String) {
+        val b = ascii(head.trim() + if (line.isNotBlank()) "\n" + line.trim() else "").toByteArray(Charsets.US_ASCII).let { it.copyOf(minOf(it.size, 180)) }
+        if (b.isEmpty()) return
+        write(byteArrayOf(4) + b); write(byteArrayOf(1))
+    }
+    private fun fobAsk(id: Long, q: String, a: String, b: String) {
+        val t = ascii(q.trim() + "\n" + a.trim() + "\n" + b.trim()).toByteArray(Charsets.US_ASCII).let { it.copyOf(minOf(it.size, 180)) }
+        write(byteArrayOf(5, id.toByte(), (id shr 8).toByte(), (id shr 16).toByte(), (id shr 24).toByte()) + t); write(byteArrayOf(1))
+    }
+    /** Shows the server's result on the fob. Returns true when it asked a question instead (no status until it is answered). */
+    private fun showResult(j: org.json.JSONObject): Boolean {
+        val ask = j.optJSONObject("ask"); val opts = ask?.optJSONArray("options")
+        if (ask != null && j.optString("state") == "asking" && opts != null && opts.length() >= 2) {
+            fobAsk(ask.optLong("id"), ask.optString("question"), opts.optString(0), opts.optString(1)); return true
+        }
+        j.optJSONObject("fob")?.let { fobText(it.optString("head"), it.optString("line")) }
+        return false
+    }
+    private fun answer(id: Long, choice: Int) {
+        wakeOn(); set("Thinking…", ""); note()
+        io.execute {
+            val body = org.json.JSONObject().put("id", id).put("choice", choice).toString().toByteArray()
+            val res = Net.call("POST", "/api/voice/answer", body, "application/json", timeoutMs = 60000)
+            val j = res.json()
+            h.post {
+                if (res.ok) {
+                    val asked = showResult(j)
+                    if (!asked) status(j.optBoolean("ok", true))
+                    set("Connected", j.optString("message", "Saved"))
+                    Notifier.voiceResult(this, true, lastHeard, j.optString("message")); Sync.now(this)
+                } else {
+                    fobText("Not saved", if (res.signedOut) "Sign in again in the app" else j.optString("error", "Try again"))
+                    status(false); set("Connected", "Not saved: " + j.optString("error", "HTTP ${res.code}"))
+                }
+                note(); wakeOff()
+            }
+        }
+    }
+
     private fun upload(pcm: ByteArray, rate: Int) {
         set("Thinking…", "")
         note()
@@ -359,7 +405,7 @@ class FobService : Service() {
                     }
                     else -> {
                         val good = j.optBoolean("ok") && j.optString("state") != "unclear"
-                        status(good)
+                        if (!showResult(j)) status(good)
                         val said = j.optString("transcript")
                         lastHeard = said
                         set("Connected", (if (said.isNotEmpty()) "You said: “$said”. " else "") + j.optString("message"))
