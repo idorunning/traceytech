@@ -368,10 +368,36 @@ document.addEventListener('click',e=>{if(!$('menu').hidden&&!e.target.closest('#
 $('assess').addEventListener('click',async e=>{const b=e.currentTarget;toggleMenu(false);b.disabled=true;env.thinkGoal=1;env.burst();$('live-text').textContent='Reassessing everything';scrollTo({top:0,behavior:reduce?'auto':'smooth'});
   try{await api('/api/assess',{});spoken='';await load(true);toast('<b>Fresh assessment ready.</b> I\'ve rearranged things to match.');}catch(err){toast(esc(err.message));}env.thinkGoal=0;b.disabled=false;});
 $('signout').addEventListener('click',async()=>{try{await fetch('/auth/logout',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:'{}'});}catch{}location.replace('/login');});
+/* ---------- talk to Conductor: the bar answers, as a conversation ---------- */
+const TALK={log:[]};try{TALK.log=JSON.parse(sessionStorage.getItem('tt-talk')||'[]')||[];}catch{}
+function talkSave(){try{sessionStorage.setItem('tt-talk',JSON.stringify(TALK.log.filter(m=>!m.busy).slice(-30)));}catch{}}
+function talkDraw(){const L=$('talk-log');if(!L)return;
+  L.innerHTML=TALK.log.length?TALK.log.map((m,i)=>`<div class="tm ${m.who}${m.busy?' busy':''}">${esc(m.text)}${(m.actions||[]).length?`<div class="tacts">${m.actions.map((a,j)=>`<button type="button" class="pill" data-tact="${i}:${j}">${esc(a.label||a.type)}</button>`).join('')}</div>`:''}</div>`).join(''):'<div class="tm c">Ask me anything about your day, your inbox or your projects.</div>';
+  L.scrollTop=L.scrollHeight;}
+function talkOpen(on){const t=$('talk');if(!t)return;t.hidden=!on;if(on){$('reply').classList.remove('on');talkDraw();}}
+async function talk(v){TALK.log.push({who:'me',text:v});const r={who:'c',text:'Thinking…',busy:true};TALK.log.push(r);talkOpen(true);
+  $('cmd').classList.add('thinking');env.thinkGoal=1;env.burst();
+  try{const j=await api('/api/conductor',{op:'chat',text:v.slice(0,1000),context:{from:'site',now:new Date().toString()},history:TALK.log.slice(0,-2).slice(-8).map(m=>({who:m.who,text:m.text}))});
+    r.text=j.answer||'I could not think of an answer. Try again.';r.actions=(j.actions||[]).filter(a=>a&&a.type);}
+  catch(err){r.text=err.message;}
+  r.busy=false;env.thinkGoal=0;$('cmd').classList.remove('thinking');env.ripple();talkDraw();talkSave();}
+{const tc=$('talk-close'),tn=$('talk-new'),tl=$('talk-log');
+  if(tc)tc.addEventListener('click',()=>talkOpen(false));
+  if(tn)tn.addEventListener('click',()=>{TALK.log=[];talkSave();talkDraw();$('cmd-input').focus();});
+  const go=u=>{const w=window.open(u,'_blank','noopener');if(!w)location.href=u;};
+  if(tl)tl.addEventListener('click',async e=>{const b=e.target.closest('[data-tact]');if(!b)return;const [i,j]=b.dataset.tact.split(':').map(Number);const a=((TALK.log[i]||{}).actions||[])[j];if(!a)return;b.disabled=true;
+    try{if(a.type==='add_todo'){const r=await api('/api/lists',{op:'add',text:a.text||a.label,list:'auto'});b.textContent='Added to '+(r.listName||'your lists');}
+      else if(a.type==='remember'){await api('/api/conductor',{op:'remember',text:a.text||a.label});b.textContent='Remembered';}
+      else if(a.type==='draft_email'){go('https://mail.google.com/mail/?view=cm&fs=1&to='+encodeURIComponent(a.to||'')+'&su='+encodeURIComponent(a.subject||'')+'&body='+encodeURIComponent(a.body||''));b.disabled=false;}
+      else if(a.type==='join'&&a.url){go(a.url);b.disabled=false;}
+      else if(a.type==='make_lens'){const r=await api('/api/lenses',{op:'design',text:a.text||a.label});b.textContent=r.lens?'Lens made: '+r.lens.name:'Done';}
+      else b.textContent='Open the app for this';}
+    catch(err){b.textContent=String(err.message||'Failed').slice(0,48);}});}
 $('cmd').addEventListener('submit',async e=>{e.preventDefault();const i=$('cmd-input');const v=i.value.trim();if(!v)return;const q=v.toLowerCase();
   const pool=[...S.items,...S.sample.emails.map(e=>({kind:'email',e,key:'e:'+e.id,node:'Gmail',sample:!S.real.mail})),...S.sample.events.map(ev=>({kind:'event',ev,key:'ev:'+ev.id,node:'Calendar',sample:!S.real.cal}))];
   const hit=q.length>2&&pool.find(x=>(titleOf(x)+' '+(x.kind==='email'?x.e.from+' '+x.e.group:'')+' '+(x.group||'')).toLowerCase().includes(q));
   if(hit){i.value='';const el=document.querySelector(`[data-id="${hit.e?.id||hit.ev?.id}"]`)||$('deck');openFocus(hit,el);return;}
+  if(!/^(focus on|prioriti[sz]e|weight)\b/i.test(v)){i.value='';talk(v);return;}
   $('cmd').classList.add('thinking');env.thinkGoal=1;env.burst();
   try{await api('/api/focus',{intent:v.slice(0,300)});i.value='';setTimeout(()=>{env.thinkGoal=0;$('cmd').classList.remove('thinking');env.ripple();toast(`<b>Noted.</b> I'll weight "${esc(v)}" in the next assessment. Use Assess now in the menu to do it straight away.`);},1400);}
   catch(err){env.thinkGoal=0;$('cmd').classList.remove('thinking');toast(esc(err.message));}});
@@ -613,25 +639,34 @@ function neighbours(id){const g=S.graph;const out=new Set();g.edges.forEach(([a,
 let labelEls=new Map();
 function buildLabels(){
   const box=$('map-labels');box.innerHTML='';labelEls=new Map();
-  S.graph.nodes.filter(n=>n.kind!=='asset').forEach(n=>{const b=document.createElement('button');b.type='button';b.className=`ml ${n.kind} ${n.crit?'crit':''} ${n.sample?'smp':''}`;
+  S.graph.nodes.forEach(n=>{const b=document.createElement('button');b.type='button';b.className=`ml ${n.kind} ${n.crit?'crit':''} ${n.sample?'smp':''}`;
+    if(n.col)b.style.setProperty('--c',n.col);if(n.area&&n.kind!=='project'&&n.kind!=='source')b.title=n.area;
     b.textContent=n.label.length>38?n.label.slice(0,36)+'…':n.label;b.addEventListener('click',e=>{e.stopPropagation();tapNode(n,b);});box.appendChild(b);labelEls.set(n.id,b);});
   const k=S.graph.nodes.reduce((m,n)=>(m[n.kind]=(m[n.kind]||0)+1,m),{});
   $('map-meta').textContent=`${k.source} sources · ${k.project} projects · ${k.asset} assets · ${k.item} live items`;
+  const lg=$('map-legend');if(lg){const areas=S.graph.nodes.filter(n=>n.kind==='project'&&n.col);
+    lg.innerHTML=areas.map(n=>`<span><i style="background:${esc(n.col)}"></i>${esc(n.label)}</span>`).join('')+'<span><i class="crit"></i>Needs you</span><span><i class="smp"></i>Sample</span><span class="hint">Drag to turn · pinch or scroll to zoom · two fingers to move · tap to open</span>';}
 }
 function drawLabels(){
   const hot=env.hot;const near=hot?new Set(neighbours(hot).map(n=>n.id)):null;const sm=innerWidth<700;
   env.screen().forEach(({n,x,y,z})=>{const b=labelEls.get(n.id);if(!b)return;
-    const show=n.kind!=='item'||!sm||n.crit||n.id===hot||(near&&near.has(n.id));
+    const zm=env.zoom||1,nb=near&&near.has(n.id);
+    const show=n.kind==='asset'?(n.id===hot||(nb&&zm>=1.3)||zm>=2.3):n.kind!=='item'||!sm||n.crit||n.id===hot||nb||zm>=1.6;
     const dim=hot&&n.id!==hot&&!(near&&near.has(n.id))&&n.kind!=='hub';
     b.style.transform=`translate(${x.toFixed(1)}px,${y.toFixed(1)}px)`;b.style.opacity=show?(dim?.28:1)*(1.15-Math.max(0,z-.9)*8):0;b.style.pointerEvents=show?'auto':'none';b.classList.toggle('on',n.id===hot);});
 }
 function tapNode(n,el){
+  env.centre&&env.centre();
+  if(n.kind==='asset'){env.hot=n.id;return;}
   if(n.kind==='item'){env.hot=n.id;openFocus(n.ref,el);return;}
   env.hot=env.hot===n.id?null:n.id;if(!env.hot)return;
   openFocus({kind:'node',n,key:'n:'+n.id,node:n.kind==='source'?n.label:null,sample:false},el);
 }
-function openMap(){if(!$('env'))return;toggleMenu(false);document.body.classList.add('map');env.mapGoal=1;$('mapui').hidden=false;buildLabels();env.onFrame=drawLabels;}
-function closeMap(){document.body.classList.remove('map');env.mapGoal=0;env.hot=null;$('mapui').hidden=true;env.onFrame=null;}
+function appPull(on){try{window.ConductorPage&&window.ConductorPage.top(!!on);}catch(e){}}
+function openMap(){if(!$('env'))return;toggleMenu(false);document.body.classList.add('map');env.mapGoal=1;$('mapui').hidden=false;buildLabels();env.onFrame=drawLabels;appPull(false);
+  env.onEmptyTap=()=>{env.hot=null;};}
+function closeMap(){document.body.classList.remove('map');env.mapGoal=0;env.hot=null;$('mapui').hidden=true;env.onFrame=null;env.resetView&&env.resetView();appPull(true);}
+{const zb=(id,f)=>{const b=$(id);if(b)b.addEventListener('click',f);};zb('map-zin',()=>env.zoomBy&&env.zoomBy(1.35));zb('map-zout',()=>env.zoomBy&&env.zoomBy(1/1.35));zb('map-zfit',()=>{env.hot=null;env.resetView&&env.resetView();});}
 $('map-open').addEventListener('click',()=>{closePane(true);openMap();});$('map-menu').addEventListener('click',openMap);$('map-close').addEventListener('click',closeMap);
 function nodeDetail(n){
   const nb=neighbours(n.id);const items=nb.filter(x=>x.kind==='item');const assets=nb.filter(x=>x.kind==='asset');const links=nb.filter(x=>x.kind==='source'||x.kind==='project');
@@ -960,6 +995,7 @@ async function load(){
   S.ideas=ideas();S.graph=graphData();
   if(!sceneOn){sceneOn=true;initEnv();env.live=true;if(reduce||!$('env'))setInterval(()=>{const m=env.pick();if(m)env.onPulse(m);},4000);}
   env.setGraph(S.graph);if(document.body.classList.contains('map'))buildLabels();
+  if(!window.__hashMap&&location.hash==='#map'){window.__hashMap=1;openMap();}
   composeVoice();renderChain();renderDeck();renderIdeas();renderInbox();renderAhead();renderToday();renderPulse();renderSources();renderGoogle();renderLearned();
   renderPreviews();loadGoogle().then(loadFeed);loadGoat().then(()=>{renderLenses();refreshConns();});loadMaps().then(()=>{if(navigator.permissions&&navigator.permissions.query)navigator.permissions.query({name:'geolocation'}).then(p=>{if(p.state==='granted')getPos().then(()=>fetchRoute()).then(refreshMaps);}).catch(()=>{});else refreshMaps();});loadAnswers().then(()=>{if(S.clash)refreshClash();});if(!CS.loaded)loadConns().then(()=>{renderLenses();refreshConns();});
   if(/[?&]google=connected/.test(location.search)){history.replaceState(null,'','/');toast('<b>Google connected.</b> Open Plugged in and press Test every service.');}

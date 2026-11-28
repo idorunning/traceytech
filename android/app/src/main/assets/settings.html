@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Settings</title>
+<link rel="stylesheet" href="common.css">
+<style>
+main{padding:0 14px 40px}
+section{margin-bottom:14px;padding:4px 0}
+section h2{font:500 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.16em;text-transform:uppercase;color:var(--ash);margin:16px 16px 6px}
+.line{display:flex;align-items:center;gap:12px;padding:13px 16px;border-top:1px solid var(--line)}
+.line.wa{gap:8px;padding:10px 12px}.line.wa .pill{flex:0 0 auto;width:40px;min-width:0;padding:0}.line.wa input:not([type=checkbox]){flex:1;min-width:0;background:rgba(239,237,232,.06);border:1px solid var(--line);border-radius:10px;color:inherit;font:inherit;padding:8px 10px}
+.line:first-of-type{border-top:0}
+.line .l{flex:1;min-width:0}
+.line .s{font-size:13px;color:var(--ash);margin-top:2px}
+.state{font-size:14px;min-height:44px;padding:0 12px;border-radius:12px;border:1px solid var(--line2);white-space:nowrap;display:inline-flex;align-items:center;justify-content:center}
+.line>.pill,.line>.state{min-width:92px;flex:none}
+.state.ok{color:var(--ok);border-color:#3fb95055}
+.state.no{color:#ff9b95;border-color:#e5322b55}
+.sw{position:relative;width:46px;height:28px;flex:none}
+.sw input{opacity:0;width:0;height:0;position:absolute}
+.sw span{position:absolute;inset:0;border-radius:28px;background:#2a2a2d;transition:.2s}
+.sw span::after{content:"";position:absolute;left:3px;top:3px;width:22px;height:22px;border-radius:50%;background:var(--ash);transition:.2s}
+.sw input:checked+span{background:var(--paper)}
+.sw input:checked+span::after{left:21px;background:var(--void)}
+select.t{width:auto;min-height:44px;padding:0 10px;border-radius:12px}
+.dot{width:10px;height:10px;border-radius:50%;background:#555;flex:none}
+.dot.on{background:var(--ok)}.dot.busy{background:var(--warn)}
+.btns{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:8px;padding:0 16px 14px}
+</style>
+</head>
+<body>
+<header class="top"><div><p class="eyebrow">Conductor IO</p><h1>Settings</h1></div></header>
+<main id="main"></main>
+<script src="common.js"></script>
+<script>
+'use strict';
+const PERMS=[['notifications','Notifications','Reminders, calendar, voice notes and email'],
+  ['nearby','Nearby devices','Connects the voice fob over Bluetooth'],
+  ['alarms','Alarms and reminders','Reminders arrive at the exact minute'],
+  ['battery','Battery: Unrestricted','Keeps the fob connected and updates on time. Open, then Battery, then Unrestricted.'],
+  ['location','Location','Nearby places and routes on the Home screen'],
+  ['contacts','Contacts','Say "message Sam…" to the pin and WhatsApp opens with it typed. Read on the phone only.'],
+  ['whatsapp','WhatsApp auto-send','Pin messages send with no tap. Opens Accessibility: tap Installed apps (or Downloaded apps), then Conductor IO: WhatsApp auto-send, then turn it on.']];
+const LENS_INFO=[['schedule','Schedule','Your shift, today and tomorrow. Online meetings get a Join button.'],
+  ['replies','Replies','Invites waiting for yes, maybe or no.'],
+  ['lists','Lists','The top to-dos that are due or overdue. Empty lists stay hidden.'],
+  ['inbox','Inbox','Email from real people, not newsletters.'],
+  ['out','Out and about','In-person places only, with directions and errands nearby.'],
+  ['voice','Voice notes','Recent notes from the fob or the phone, and anything waiting for your OK.'],
+  ['trips','Trips and plans','Countdowns to trips, and a warning when you are due to work.'],
+  ['seo','Search Console','Clicks, searches and problems for haylinglegends.co.uk, and searches close to page one.'],
+  ['conns','Connections','Only shows when something is broken, such as Google or the fob.']];
+try{const c=JSON.parse((window.Native&&Native.cached('lenses'))||'{}');(c.lenses||[]).forEach(l=>LENS_INFO.push([l.key,l.name,(l.summary||'A lens you designed')+' You designed this one. Change or delete it from its card on Home.']));}catch(e){}
+let MEM=null,MEMERR='';
+function lensPrefs(){try{return JSON.parse(N.lensPrefs()||'{}');}catch(e){return {};}}
+async function loadMem(){const r=await api('GET','/api/conductor');if(r.ok){MEM=r.json.memory||[];MEMERR='';}else MEMERR=r.code===401?'Sign in to see what Conductor remembers.':(r.json.error||'Not available yet');render();}
+function sw(k,on){return `<label class="sw"><input type="checkbox" data-p="${k}"${on?' checked':''}><span></span></label>`;}
+function ago(t){if(!t)return 'Not yet';const m=Math.round((Date.now()-t)/6e4);if(m<1)return 'Just now';if(m<60)return m+' min ago';const h=Math.round(m/60);return h<24?h+' h ago':new Date(t).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});}
+function waRows(j){let a=[];try{a=JSON.parse(j||'[]');}catch(e){}
+  return a.map(o=>`<div class="line wa"><input class="wa-say" value="${esc(o.say)}" placeholder="You say" aria-label="You say"><span class="muted">→</span><input class="wa-to" value="${esc(o.to)}" placeholder="Contact or group" aria-label="Contact or group"><label class="muted" style="font-size:12px"><input type="checkbox" class="wa-g" ${o.group?'checked':''}> Group</label><button class="pill" data-wadel="1" aria-label="Remove">×</button></div>`).join('');}
+function waCollect(){return [...document.querySelectorAll('#waList .wa')].map(r=>({say:r.querySelector('.wa-say').value.trim(),to:r.querySelector('.wa-to').value.trim(),group:r.querySelector('.wa-g').checked})).filter(o=>o.say&&o.to);}
+function render(){
+  if(!N){$('#main').innerHTML='<p class="muted">Open this inside Conductor IO.</p>';return;}
+  const s=JSON.parse(N.state()),p=s.prefs,f=s.fob;
+  $('#main').innerHTML=`
+  <section class="card"><h2>Lenses</h2>
+    <p class="muted" style="margin:0 16px 8px;font-size:14px">Each lens is a small agent that watches one thing. Conductor reads them all and tells you what matters first. Switch off any you don't need. On Home, press and hold a lens to move it.</p>
+    ${LENS_INFO.map(([k,t,d])=>`<div class="line"><div class="l">${t}<div class="s">${d}</div></div><label class="sw"><input type="checkbox" data-lens="${k}"${(lensPrefs().off||[]).includes(k)?'':' checked'}><span></span></label></div>`).join('')}
+  </section>
+  <section class="card"><h2>What Conductor remembers</h2>
+    <p class="muted" style="margin:0 16px 8px;font-size:14px">Things you told it to remember, and what it has learned about how you work. Tap Forget to remove one.</p>
+    ${MEM==null?`<p class="muted" style="margin:0 16px 12px">${esc(MEMERR||'Loading…')}</p>`:MEM.length?MEM.map(m=>`<div class="line"><div class="l">${esc(m.text)}<div class="s">${m.kind==='profile'?'Learned':'You told it'}</div></div><button class="pill" data-forget="${m.id}">Forget</button></div>`).join(''):'<p class="muted" style="margin:0 16px 12px">Nothing yet. In the chat bar on Home, say "remember that…".</p>'}
+    ${MEM&&MEM.length?'<div class="btns"><button class="pill danger" id="forgetAll">Forget everything</button></div>':''}
+  </section>
+  <section class="card"><h2>Voice fob</h2>
+    <div class="line"><span class="dot ${f.connected?'on':f.on?'busy':''}"></span><div class="l"><div>${esc(f.status)}</div><div class="s">${esc(f.detail)}</div></div></div>
+    <div class="btns"><button class="pill solid" data-fob="toggle">${f.on?'Disconnect':'Connect fob'}</button>${f.known?'<button class="pill" data-fob="forget">Forget fob</button>':''}<button class="pill" data-fob="open">Voice notes</button></div>
+  </section>
+  <section class="card"><h2>WhatsApp names</h2>
+    <p class="muted" style="margin:0 0 8px">What you say to the pin, and who it means. Tick Group for a group chat.</p>
+    <div id="waList">${waRows(s.waAliases)}</div>
+    <div class="btns"><button class="pill" id="waAdd">Add a name</button><button class="pill solid" id="waSave">Save</button></div>
+  </section>
+  <section class="card"><h2>Notifications</h2>
+    <div class="line"><div class="l">To-do reminders<div class="s">When a to-do is due</div></div>${sw('n_remind',p.n_remind)}</div>
+    <div class="line"><div class="l">Calendar events<div class="s">Before each event starts</div></div>
+      <select class="t" data-p="n_cal_lead">${[0,5,10,15,30,60].map(m=>`<option value="${m}"${p.n_cal_lead===m?' selected':''}>${m?m+' min before':'At the start'}</option>`).join('')}</select>${sw('n_cal',p.n_cal)}</div>
+    <div class="line"><div class="l">New invites</div>${sw('n_invite',p.n_invite)}</div>
+    <div class="line"><div class="l">Voice notes<div class="s">Each recording, and items that wait for you</div></div>${sw('n_voice',p.n_voice)}</div>
+    <div class="line"><div class="l">New email<div class="s">Unread mail that is not a newsletter</div></div>${sw('n_mail',p.n_mail)}</div>
+    <div class="btns"><button class="pill" data-perm="channels">Sounds and style</button></div>
+  </section>
+  <section class="card"><h2>Background updates</h2>
+    <div class="line"><div class="l">Check TraceyTech every<div class="s">Last update: ${esc(ago(s.lastSync))}${s.lastSyncMsg?' · '+esc(s.lastSyncMsg):''}</div></div>
+      <select class="t" data-p="sync_min">${[15,30,60,120].map(m=>`<option value="${m}"${p.sync_min===m?' selected':''}>${m<60?m+' min':(m/60)+' h'}</option>`).join('')}</select></div>
+    <div class="btns"><button class="pill" id="syncNow">Update now</button></div>
+  </section>
+  <section class="card"><h2>Permissions</h2>
+    ${PERMS.map(([k,t,d])=>`<div class="line"><div class="l">${t}<div class="s">${d}</div></div>${s.perm[k]?'<span class="state ok">On</span>':`<button class="pill" data-perm="${k}">Allow</button>`}</div>`).join('')}
+  </section>
+  <section class="card"><h2>Account</h2>
+    <div class="line"><div class="l">TraceyTech<div class="s">${s.signedIn?'Signed in':'Not signed in. Sign in on the Home tab.'}</div></div>${s.signedIn?'<button class="pill danger" id="signOut">Sign out</button>':'<button class="pill" data-tab="home">Sign in</button>'}</div>
+    <div class="line"><div class="l">Google<div class="s">Connect Google once in Chrome at traceytech.app. The app uses the same connection.</div></div><button class="pill" id="google">Open</button></div>
+    <div class="line"><div class="l">TraceyTech website<div class="s">The full site, inside the app. Press back to return to Conductor.</div></div><button class="pill" data-tab="site">Open site</button></div>
+  </section>
+  <p class="muted" style="text-align:center;font-size:12px">Conductor IO ${esc(s.version)} for TraceyTech</p>`;
+}
+document.addEventListener('change',e=>{const L=e.target.dataset.lens;
+  if(L){const p=lensPrefs();const off=new Set(p.off||[]);if(e.target.checked)off.delete(L);else off.add(L);N.setLensPrefs(JSON.stringify({order:p.order||[],off:[...off]}));haptic();return;}
+  const k=e.target.dataset.p;if(!k)return;N.setPref(k,e.target.type==='checkbox'?String(e.target.checked):e.target.value);haptic();});
+document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+  if(b.id==='waAdd'){$('#waList').insertAdjacentHTML('beforeend',waRows(JSON.stringify([{say:'',to:'',group:false}])));return;}
+  if(b.id==='waSave'){N.setPref('wa_aliases',JSON.stringify(waCollect()));haptic();toast('Saved');return;}
+  if(b.dataset.wadel){b.closest('.wa').remove();return;}
+  if(b.dataset.perm)N.permission(b.dataset.perm);
+  else if(b.dataset.fob)N.fob(b.dataset.fob);
+  else if(b.dataset.tab)N.open(b.dataset.tab);
+  else if(b.dataset.forget){b.disabled=true;api('POST','/api/conductor',{op:'forget',id:+b.dataset.forget}).then(r=>{if(r.ok){MEM=MEM.filter(m=>m.id!==+b.dataset.forget);toast('Forgotten');}else toast(esc(r.json.error||'Could not forget'));render();});}
+  else if(b.id==='forgetAll'){const s=sheet('<h2>Forget everything?</h2><p class="muted">Conductor starts learning about you again from scratch.</p><div class="actions"><button class="pill" id="no">Cancel</button><button class="pill danger" id="yes">Forget everything</button></div>');
+    $('#no',s).onclick=closeSheet;$('#yes',s).onclick=async()=>{closeSheet();const r=await api('POST','/api/conductor',{op:'forget_all'});if(r.ok){MEM=[];toast('Conductor has forgotten everything');}render();};}
+  else if(b.id==='syncNow'){N.syncNow();toast('Updating…');setTimeout(render,4000);}
+  else if(b.id==='google')N.openUrl('https://traceytech.app/');
+  else if(b.id==='signOut'){const s=sheet('<h2>Sign out of TraceyTech?</h2><p class="muted">Reminders and voice notes stop until you sign in again.</p><div class="actions"><button class="pill" id="no">Cancel</button><button class="pill danger" id="yes">Sign out</button></div>');
+    $('#no',s).onclick=closeSheet;$('#yes',s).onclick=()=>{closeSheet();N.signOut();};}
+});
+window.onNativeChange=render;window.onNativeShow=()=>{render();loadMem();};window.onNativeReselect=window.onNativeShow;
+render();loadMem();setInterval(()=>{if(document.visibilityState==='visible'&&!document.querySelector('select:focus'))render();},5000);
+</script>
+</body>
+</html>

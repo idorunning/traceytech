@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Lists</title>
+<link rel="stylesheet" href="common.css">
+<style>
+.hbtns{display:flex;gap:8px}
+.agentbtn{position:relative}
+.badge{position:absolute;top:-6px;right:-6px;min-width:19px;height:19px;border-radius:10px;background:var(--signal);color:#fff;font:600 11px/19px system-ui;text-align:center;padding:0 5px}
+.chips{display:flex;gap:8px;overflow-x:auto;padding:4px 18px 12px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;display:flex;align-items:center;gap:8px;border:1px solid var(--line2);border-radius:999px;padding:8px 14px;font-size:14px;color:var(--mist);user-select:none}
+.chip .sw{width:8px;height:8px;border-radius:50%}
+.chip .n{font:12px ui-monospace,Menlo,monospace;color:var(--ash)}
+.chip.on{background:var(--paper);color:var(--void);border-color:var(--paper);font-weight:600}
+.chip.on .n{color:#09090a99}
+main{padding:0 14px 120px}
+.banner{margin:0 4px 12px;padding:12px 14px;display:flex;align-items:center;gap:12px;width:calc(100% - 8px);text-align:left}
+.banner .spark{font-size:20px}
+.banner b{display:block}
+.lhead{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin:2px 4px 12px}
+.lhead p{margin:0;font-size:13px;color:var(--ash)}
+.group{margin:6px 4px 4px;font:500 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--ash);display:flex;align-items:center;gap:8px;padding:14px 0 8px}
+.group .sw{width:7px;height:7px;border-radius:50%}
+.item{display:flex;align-items:flex-start;gap:12px;padding:13px 14px;margin-bottom:8px}
+.tick{flex:none;width:24px;height:24px;border-radius:50%;border:1.6px solid var(--line2);margin-top:1px;display:grid;place-items:center;transition:all .15s}
+.tick.done{background:var(--paper);border-color:var(--paper)}
+.tick.done::after{content:"";width:9px;height:5px;border:2px solid var(--void);border-top:0;border-right:0;transform:rotate(-45deg) translate(1px,-1px)}
+.body{flex:1;min-width:0}
+.txt{word-wrap:break-word}
+.item.done .txt,.sheetrow.done .ttxt{color:var(--ash);text-decoration:line-through}
+.meta{display:flex;gap:6px 10px;flex-wrap:wrap;margin-top:3px;font-size:12.5px;color:var(--ash)}
+.meta .late{color:#ff8a83}.meta .soon{color:var(--warn)}
+.tag{border:1px solid var(--line);border-radius:6px;padding:0 6px}
+.grid{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table.xls{border-collapse:separate;border-spacing:0;min-width:100%;font-size:14px}
+table.xls th{font:500 10.5px/1 ui-monospace,Menlo,monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--ash);text-align:left;padding:10px 10px;border-bottom:1px solid var(--line2);white-space:nowrap}
+table.xls td{padding:11px 10px;border-bottom:1px solid var(--line);vertical-align:top;min-width:84px;max-width:220px}
+table.xls td.tc{min-width:36px;width:36px;padding-right:0}
+table.xls td.it{min-width:170px}
+table.xls td .empty{color:#8f8e8a55}
+table.xls tr.sheetrow:active td{background:#ffffff08}
+.sel{display:inline-block;border-radius:6px;padding:1px 7px;font-size:12.5px;background:#ffffff10}
+.empty{text-align:center;color:var(--ash);padding:48px 20px}
+.donehead{display:flex;justify-content:space-between;align-items:center;width:100%;padding:16px 4px 8px;color:var(--ash);font-size:13px}
+.composer{position:fixed;left:0;right:0;bottom:0;padding:10px 12px 12px;background:linear-gradient(transparent,#09090a 28%);z-index:10}
+.composer .box{display:flex;gap:8px;align-items:center;padding:6px 6px 6px 14px;border-radius:999px}
+.composer input{flex:1;background:none;border:0;outline:none;padding:8px 0;min-width:0}
+.composer .due{font-size:12.5px;color:var(--mist);border:1px solid var(--line2);border-radius:999px;padding:7px 10px;white-space:nowrap}
+.composer .due.set{border-color:var(--warn);color:var(--warn)}
+.composer .add{width:38px;height:38px;border-radius:50%;background:var(--paper);color:var(--void);font-size:22px;line-height:38px;text-align:center;flex:none}
+.note{margin:0 18px 10px;padding:10px 12px;font-size:13px;color:var(--mist)}
+.colors{display:flex;gap:10px;margin-top:6px;flex-wrap:wrap}
+.colors button{width:30px;height:30px;border-radius:50%;border:2px solid transparent}
+.colors button.on{border-color:var(--paper)}
+.sug{padding:12px 0;border-top:1px solid var(--line)}
+.sug:first-of-type{border-top:0}
+.sug .what{font-weight:600}
+.sug .why{font-size:13px;color:var(--ash);margin:3px 0 8px}
+.sug .row .pill{padding:6px 12px;font-size:13px}
+.colrow{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.colrow input{flex:1}
+.colrow select{width:auto}
+.seg{display:flex;border:1px solid var(--line2);border-radius:999px;overflow:hidden}
+.seg button{flex:1;padding:9px;font-size:14px;color:var(--mist)}
+.seg button.on{background:var(--paper);color:var(--void);font-weight:600}
+.sw2{position:relative;width:46px;height:28px;flex:none}
+.sw2 input{opacity:0;width:0;height:0;position:absolute}
+.sw2 span{position:absolute;inset:0;border-radius:28px;background:#2a2a2d;transition:.2s}
+.sw2 span::after{content:"";position:absolute;left:3px;top:3px;width:22px;height:22px;border-radius:50%;background:var(--ash);transition:.2s}
+.sw2 input:checked+span{background:var(--paper)}
+.sw2 input:checked+span::after{left:21px;background:var(--void)}
+</style>
+</head>
+<body>
+<header class="top">
+  <div><p class="eyebrow" id="eyebrow">To-do</p><h1>Lists</h1></div>
+  <div class="hbtns"><button class="pill agentbtn" id="agentBtn" aria-label="Lists agent">✦ Agent<span class="badge" id="badge" hidden></span></button><button class="pill" id="newList">+ List</button></div>
+</header>
+<div id="mode"></div>
+<div class="chips" id="chips"></div>
+<main id="main"><p class="empty">Loading…</p></main>
+<div class="composer"><div class="box card">
+  <input id="txt" placeholder="Add a to-do" enterkeyhint="done" autocomplete="off">
+  <button class="due" id="dueBtn">Due</button>
+  <button class="add" id="addBtn" aria-label="Add">+</button>
+</div></div>
+<script src="common.js"></script>
+<script>
+'use strict';
+const COLORS=['#efede8','#e5322b','#e3b341','#3fb950','#58a6ff','#bc8cff','#ff7eb6','#ffa657','#79c0ff','#8f8e8a'];
+const DEFAULTS=[{id:'general',name:'To-do',cat:'general',color:'#efede8'},{id:'shopping',name:'Shopping',cat:'shopping',color:'#3fb950'},
+  {id:'town',name:'Errands',cat:'town',color:'#58a6ff'},{id:'work',name:'Work',cat:'work',color:'#e3b341'}];
+let S={mode:'',lists:[],todos:[],sugs:[],agent:{},sel:'all',showDone:false,due:''};
+try{S.sel=localStorage.getItem('cio_sel')||'all';}catch(e){}
+const norm=l=>({...l,id:String(l.id),kind:l.kind||'checklist',columns:l.columns||[],purpose:l.purpose||''});
+
+/* ---------- data: the server's lists, or (without them) lists kept on this phone ---------- */
+const local={
+  get lists(){try{return JSON.parse(localStorage.getItem('cio_lists')||'[]');}catch(e){return [];}},
+  set lists(v){localStorage.setItem('cio_lists',JSON.stringify(v));},
+  get map(){try{return JSON.parse(localStorage.getItem('cio_map')||'{}');}catch(e){return {};}},
+  set map(v){localStorage.setItem('cio_map',JSON.stringify(v));}
+};
+function take(j){S.mode='server';S.lists=(j.lists||[]).map(norm);S.todos=(j.todos||[]).map(t=>({...t,list:String(t.list),fields:t.fields||{}}));S.sugs=j.suggestions||[];S.agent=j.agent||{};}
+async function load(){
+  if(!S.lists.length){const c=N&&N.cached('lists');if(c)try{take(JSON.parse(c));render();}catch(e){}}
+  const r=await api('GET','/api/lists');
+  if(r.ok)take(r.json);
+  else if(r.code===404){const t=await api('GET','/api/todos');
+    if(!t.ok)return fail(t);
+    const m=local.map;S.mode='local';S.sugs=[];S.lists=[...DEFAULTS,...local.lists].map(norm);
+    S.todos=(t.json.rows||[]).map(x=>({id:x.id,text:x.text,due:x.due||'',state:x.state||'open',fields:{},list:String(m[x.id]||x.cat||'general')}));}
+  else return fail(r);
+  if(S.sel!=='all'&&!S.lists.some(l=>l.id===S.sel))S.sel='all';
+  render();
+}
+function fail(r){if(r.code===401){$('#main').innerHTML='<p class="empty">Sign in on the Home tab first.<br><br><button class="pill" onclick="Native.open(\'home\')">Go to Home</button></p>';return;}
+  if(!S.todos.length)$('#main').innerHTML='<p class="empty">'+esc(r.json.error||'Could not load your lists.')+'<br><br><button class="pill" onclick="load()">Try again</button></p>';
+  else toast(esc(r.json.error||'Offline. Showing the last copy.'));}
+async function post(body){const r=await api('POST','/api/lists',body);if(!r.ok)toast('<b>Not saved.</b> '+esc(r.json.error||('Error '+r.code)));return r;}
+const srv=()=>S.mode==='server';
+const store={
+  async add(list,text,due){
+    if(srv())return post({op:'add',list:list==='auto'?'auto':Number(list),text,due});
+    const l=S.lists.find(x=>x.id===list)||S.lists[0];
+    const r=await api('POST','/api/todos',{text,cat:l.cat||'general',due});if(!r.ok){toast('<b>Not added.</b> '+esc(r.json.error||''));return r;}
+    if(!l.cat&&r.json.id){const m=local.map;m[r.json.id]=l.id;local.map=m;}return r;},
+  async state(id,st){
+    if(srv())return (await post({op:'state',todo:id,state:st})).ok;
+    const r=await api('POST','/api/todos',{id,state:st});if(!r.ok)toast('<b>Not saved.</b> '+esc(r.json.error||''));return r.ok;},
+  async move(id,list){if(srv())return (await post({op:'move',todo:id,list:Number(list)})).ok;const m=local.map;m[id]=list;local.map=m;return true;},
+  async edit(id,text,due,fields){if(srv())return (await post({op:'edit',todo:id,text,due,fields})).ok;toast('Editing needs the lists feature on the server.');return false;},
+  async create(o){if(srv())return (await post({op:'create',...o})).json.id;const id='c'+Date.now();local.lists=[...local.lists,{id,name:o.name,color:o.color}];return id;},
+  async saveList(id,o){if(srv())return (await post({op:'list',id:Number(id),...o})).ok;local.lists=local.lists.map(l=>l.id===id?{...l,name:o.name,color:o.color}:l);return true;},
+  async remove(id){if(srv())return (await post({op:'delete',id:Number(id)})).ok;
+    local.lists=local.lists.filter(l=>l.id!==id);const m=local.map;for(const k in m)if(m[k]===id)delete m[k];local.map=m;return true;}
+};
+
+/* ---------- dates ---------- */
+function dueAt(d){if(!d)return null;if(/^\d{4}-\d{2}-\d{2}$/.test(d)){const t=new Date(d+'T09:00');return isNaN(t)?null:t;}
+  if(/^\d{4}-\d{2}-\d{2}T/.test(d)){const t=new Date(d);return isNaN(t)?null:t;}return null;}
+function dueLabel(d){const t=dueAt(d);if(!t)return d?{txt:d[0].toUpperCase()+d.slice(1),cls:''}:null;
+  const now=new Date(),day=x=>new Date(x.getFullYear(),x.getMonth(),x.getDate()).getTime();
+  const diff=Math.round((day(t)-day(now))/864e5);const hm=d.length>10?' '+t.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'';
+  const name=diff===0?'Today':diff===1?'Tomorrow':diff===-1?'Yesterday':(diff>1&&diff<7?t.toLocaleDateString('en-GB',{weekday:'long'}):t.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'}));
+  return {txt:name+hm,cls:t<now?'late':(t-now<3*36e5?'soon':'')};}
+function isoLocal(t){const p=n=>String(n).padStart(2,'0');return t.getFullYear()+'-'+p(t.getMonth()+1)+'-'+p(t.getDate())+'T'+p(t.getHours())+':'+p(t.getMinutes());}
+function sortOpen(a,b){const x=dueAt(a.due),y=dueAt(b.due);if(x&&y)return x-y;if(x)return -1;if(y)return 1;return b.id-a.id;}
+
+/* ---------- drawing ---------- */
+function listOf(id){return S.lists.find(l=>l.id===id)||S.lists[0]||DEFAULTS[0];}
+function cell(c,v){if(!v)return '<span class="empty">–</span>';if(c.type==='select')return `<span class="sel">${esc(v)}</span>`;if(c.type==='url')return `<a href="${esc(v)}" onclick="event.stopPropagation()">${esc(v.replace(/^https?:\/\/(www\.)?/,'').slice(0,28))}</a>`;return esc(v);}
+function render(){
+  $('#mode').innerHTML=S.mode==='local'?'<div class="note card">Your own lists are kept on this phone until the lists feature is switched on at traceytech.app. Items still sync with TraceyTech.</div>':'';
+  $('#agentBtn').hidden=!srv();const b=$('#badge');b.hidden=!S.sugs.length;b.textContent=S.sugs.length;
+  const open=S.todos.filter(t=>t.state==='open');const count=id=>open.filter(t=>t.list===id).length;
+  $('#chips').innerHTML=[`<button class="chip${S.sel==='all'?' on':''}" data-l="all">All <span class="n">${open.length}</span></button>`,
+    ...S.lists.map(l=>`<button class="chip${S.sel===l.id?' on':''}" data-l="${esc(l.id)}"><span class="sw" style="background:${esc(l.color||'#efede8')}"></span>${esc(l.name)} <span class="n">${count(l.id)}</span></button>`)].join('');
+  $('#eyebrow').textContent=open.length?open.length+' open':'All clear';
+  $('#txt').placeholder=S.sel==='all'?(srv()?'Add anything. The agent picks the list':'Add to To-do'):'Add to '+listOf(S.sel).name;
+  const inSel=t=>S.sel==='all'||t.list===S.sel;
+  const items=open.filter(inSel).sort(sortOpen),done=S.todos.filter(t=>t.state==='done'&&inSel(t));
+  let h='';
+  if(S.sugs.length&&S.sel==='all')h+=`<button class="banner card" id="sugBanner"><span class="spark">✦</span><span><b>The lists agent has ${S.sugs.length} suggestion${S.sugs.length>1?'s':''}</b><span class="muted" style="font-size:13px">Tap to look them over</span></span></button>`;
+  if(S.sel==='all'){for(const l of S.lists){const g=items.filter(t=>t.list===l.id);if(!g.length)continue;
+      h+=`<div class="group"><span class="sw" style="background:${esc(l.color||'#efede8')}"></span>${esc(l.name)}</div>`+g.map(row).join('');}
+    const orphan=items.filter(t=>!S.lists.some(l=>l.id===t.list));if(orphan.length)h+='<div class="group">Other</div>'+orphan.map(row).join('');
+    if(!items.length)h+='<p class="empty">Nothing to do. Add something below.</p>';}
+  else{const l=listOf(S.sel);
+    h+=`<div class="lhead"><p>${esc(l.purpose||'')}</p><button class="pill" id="listMenu">⋯</button></div>`;
+    if(l.kind==='table'&&l.columns.length)h+=sheetView(l,items,done);
+    else{h+=items.map(row).join('');if(!items.length)h+='<p class="empty">Nothing on this list yet.</p>';}}
+  if(done.length&&!(S.sel!=='all'&&listOf(S.sel).kind==='table'&&listOf(S.sel).columns.length)){h+=`<button class="donehead" id="doneToggle"><span>Done recently (${done.length})</span><span>${S.showDone?'Hide':'Show'}</span></button>`;
+    if(S.showDone)h+=done.map(row).join('');}
+  $('#main').innerHTML=h;
+  try{localStorage.setItem('cio_sel',S.sel);}catch(e){}
+}
+function row(t){const d=dueLabel(t.due),l=listOf(t.list);
+  const tags=(l.columns||[]).filter(c=>t.fields&&t.fields[c.key]).map(c=>`<span class="tag">${esc(t.fields[c.key])}</span>`).join('');
+  return `<div class="item card${t.state==='done'?' done':''}" data-t="${t.id}"><button class="tick${t.state==='done'?' done':''}" data-tick="${t.id}" aria-label="Done"></button>
+  <div class="body"><div class="txt">${esc(t.text)}</div>${d||tags?`<div class="meta">${d?`<span class="${d.cls}">${esc(d.txt)}</span>`:''}${tags}</div>`:''}</div></div>`;}
+function sheetView(l,items,done){
+  const rows=[...items,...(S.showDone?done:[])];
+  const head=`<tr><th></th><th>Item</th><th>Due</th>${l.columns.map(c=>`<th>${esc(c.label)}</th>`).join('')}</tr>`;
+  const body=rows.map(t=>{const d=dueLabel(t.due);return `<tr class="sheetrow${t.state==='done'?' done':''}" data-t="${t.id}"><td class="tc"><button class="tick${t.state==='done'?' done':''}" data-tick="${t.id}" aria-label="Done"></button></td>
+    <td class="it"><span class="ttxt">${esc(t.text)}</span></td><td>${d?`<span class="${d.cls}" style="white-space:nowrap">${esc(d.txt)}</span>`:'<span class="empty">–</span>'}</td>
+    ${l.columns.map(c=>`<td>${cell(c,t.fields&&t.fields[c.key])}</td>`).join('')}</tr>`;}).join('');
+  return `<div class="grid card" style="padding:0 6px"><table class="xls">${head}${body}</table></div>`+
+    (rows.length?'':'<p class="empty">Nothing on this list yet.</p>')+
+    (done.length?`<button class="donehead" id="doneToggle"><span>Done recently (${done.length})</span><span>${S.showDone?'Hide':'Show'}</span></button>`:'');}
+
+/* ---------- actions ---------- */
+document.addEventListener('click',async e=>{
+  if(e.target.closest('a'))return;
+  const chip=e.target.closest('#chips .chip');if(chip){S.sel=chip.dataset.l;render();window.scrollTo(0,0);return;}
+  const tick=e.target.closest('[data-tick]');if(tick){const id=Number(tick.dataset.tick),t=S.todos.find(x=>x.id===id);if(!t)return;
+    const to=t.state==='done'?'open':'done';const was=t.state;t.state=to;haptic();render();
+    if(!(await store.state(id,to))){t.state=was;render();}else if(to==='done')toast('Done. <u id="undo" data-u="'+id+'">Undo</u>',4000);return;}
+  if(e.target.id==='undo'){const id=Number(e.target.dataset.u),t=S.todos.find(x=>x.id===id);if(t){t.state='open';render();await store.state(id,'open');}return;}
+  if(e.target.closest('#doneToggle')){S.showDone=!S.showDone;render();return;}
+  if(e.target.closest('#sugBanner')){agentSheet();return;}
+  if(e.target.closest('#listMenu')){listMenu(S.sel);return;}
+  const it=e.target.closest('[data-t]');if(it&&!e.target.closest('#sheet')){itemSheet(Number(it.dataset.t));return;}
+});
+let pressT=null;
+document.addEventListener('touchstart',e=>{const c=e.target.closest('#chips .chip');if(!c||c.dataset.l==='all')return;pressT=setTimeout(()=>{haptic();listSettings(c.dataset.l);},520);},{passive:true});
+['touchend','touchmove','touchcancel'].forEach(ev=>document.addEventListener(ev,()=>clearTimeout(pressT),{passive:true}));
+
+$('#addBtn').onclick=add;
+$('#txt').addEventListener('keydown',e=>{if(e.key==='Enter')add();});
+async function add(){const text=$('#txt').value.trim();if(text.length<2){toast('Write the to-do first.');return;}
+  const list=S.sel==='all'?(srv()?'auto':(S.lists.find(l=>l.cat==='general')||S.lists[0]).id):S.sel;
+  $('#addBtn').disabled=true;if(list==='auto')toast('Finding the right list…',8000);
+  const r=await store.add(list,text,S.due);$('#addBtn').disabled=false;
+  if(r.ok){$('#txt').value='';S.due='';dueBtn();haptic();if(list==='auto')toast(r.json.listName?'Filed in <b>'+esc(r.json.listName)+'</b>.':'Added to To-do.');await load();}}
+function dueBtn(){const b=$('#dueBtn'),d=dueLabel(S.due);b.textContent=d?d.txt:'Due';b.classList.toggle('set',!!S.due);}
+$('#dueBtn').onclick=()=>pickDue(S.due,v=>{S.due=v;dueBtn();});
+
+function pickDue(cur,done){const now=new Date();const at=(d,h)=>{const t=new Date(now);t.setDate(t.getDate()+d);t.setHours(h,0,0,0);return isoLocal(t);};
+  const inH=h=>{const t=new Date(now.getTime()+h*36e5);t.setMinutes(0,0,0);return isoLocal(t);};
+  const sat=(()=>{const t=new Date(now);t.setDate(t.getDate()+((6-t.getDay()+7)%7||7));t.setHours(10,0,0,0);return isoLocal(t);})();
+  const opts=[['In 1 hour',inH(1)],['This evening',at(0,18)],['Tomorrow morning',at(1,9)],['Tomorrow evening',at(1,18)],['Saturday',sat],['Next week',at(7,9)]];
+  const s=sheet(`<h2>When is it due?</h2><div class="wrap">${opts.map(o=>`<button class="pill" data-v="${o[1]}">${o[0]}</button>`).join('')}</div>
+    <label class="f">Pick a date and time</label><input class="t" type="datetime-local" id="dt" value="${esc(cur&&cur.length>10?cur.slice(0,16):'')}">
+    <div class="actions"><button class="pill" data-v="">No due date</button><button class="pill solid" id="dtok">Set</button></div>`);
+  s.onclick=e=>{const b=e.target.closest('[data-v]');if(b){done(b.dataset.v);closeSheet();}};
+  $('#dtok',s).onclick=()=>{done($('#dt',s).value);closeSheet();};}
+
+function fieldInput(c,v){if(c.type==='select')return `<div class="wrap" data-fk="${esc(c.key)}">${['',...c.options].map(o=>`<button class="chip${(v||'')===o?' on':''}" data-o="${esc(o)}">${o?esc(o):'None'}</button>`).join('')}</div>`;
+  return `<input class="t" data-fk="${esc(c.key)}" type="${c.type==='url'?'url':c.type==='number'?'number':c.type==='date'?'date':'text'}" value="${esc(v||'')}">`;}
+function itemSheet(id){const t=S.todos.find(x=>x.id===id);if(!t)return;let due=t.due,list=t.list;const l=listOf(t.list);
+  const s=sheet(`<h2>To-do</h2><textarea class="t" id="et" rows="2">${esc(t.text)}</textarea>
+    <label class="f">Due</label><button class="pill" id="edue"></button>
+    ${srv()?(l.columns||[]).map(c=>`<label class="f">${esc(c.label)}</label>${fieldInput(c,t.fields&&t.fields[c.key])}`).join(''):''}
+    <label class="f">List</label><div class="wrap" id="elist">${S.lists.map(x=>`<button class="chip${x.id===list?' on':''}" data-m="${esc(x.id)}"><span class="sw" style="background:${esc(x.color||'#efede8')}"></span>${esc(x.name)}</button>`).join('')}</div>
+    <div class="actions"><button class="pill danger" id="eign">Remove</button><button class="pill" id="edone">${t.state==='done'?'Not done':'Done'}</button><button class="pill solid" id="esave">Save</button></div>`);
+  const dl=()=>{const d=dueLabel(due);$('#edue',s).textContent=d?d.txt:'No due date';};dl();
+  const fields=()=>{const o={};$$('[data-fk]',s).forEach(el=>{o[el.dataset.fk]=el.tagName==='INPUT'?el.value.trim():(($('.chip.on',el)||{}).dataset||{}).o||'';});return o;};
+  s.addEventListener('click',e=>{const o=e.target.closest('[data-fk] .chip');if(o){$$('.chip',o.parentNode).forEach(c=>c.classList.toggle('on',c===o));}});
+  $('#edue',s).onclick=()=>{const keep={text:$('#et',s).value.trim(),f:fields()};pickDue(due,v=>{due=v;setTimeout(()=>save(keep),0);});};
+  $('#elist',s).onclick=e=>{const b=e.target.closest('[data-m]');if(!b)return;list=b.dataset.m;$$('#elist .chip',s).forEach(c=>c.classList.toggle('on',c===b));};
+  $('#eign',s).onclick=async()=>{closeSheet();t.state='ignored';render();if(await store.state(id,'ignored'))toast('Removed. <u id="undo" data-u="'+id+'">Undo</u>',4000);};
+  $('#edone',s).onclick=async()=>{closeSheet();const to=t.state==='done'?'open':'done';t.state=to;render();await store.state(id,to);};
+  async function save(keep){const text=keep?keep.text:$('#et',s).value.trim(),f=keep?keep.f:fields();closeSheet();
+    const changedF=srv()&&(l.columns||[]).some(c=>(f[c.key]||'')!==((t.fields||{})[c.key]||''));
+    let ok=true;if(text!==t.text||due!==t.due||changedF){if(srv())ok=await store.edit(id,text,due,f);else{toast('Editing needs the lists feature on the server.');ok=false;}}
+    if(ok&&list!==t.list)ok=await store.move(id,list);if(ok){haptic();await load();}}
+  $('#esave',s).onclick=()=>save(null);}
+
+/* ---------- lists ---------- */
+function listMenu(id){const l=listOf(id);
+  const s=sheet(`<h2>${esc(l.name)}</h2><div class="actions" style="flex-direction:column">
+    <button class="pill" id="mSet">List settings and columns</button>
+    <button class="pill" id="mCsv">Export as spreadsheet (.csv)</button>
+    <button class="pill" id="mMd">Export as Markdown (.md)</button></div>`);
+  $('#mSet',s).onclick=()=>listSettings(id);
+  $('#mCsv',s).onclick=()=>{closeSheet();exportList(l,'csv');};
+  $('#mMd',s).onclick=()=>{closeSheet();exportList(l,'md');};}
+function listSettings(id){const l=id?S.lists.find(x=>x.id===id):null;let color=(l&&l.color)||COLORS[4],kind=(l&&l.kind)||'checklist';let cols=JSON.parse(JSON.stringify((l&&l.columns)||[]));
+  const builtin=l&&l.cat;
+  const colRows=()=>cols.map((c,i)=>`<div class="colrow"><input class="t" data-ci="${i}" value="${esc(c.label)}" placeholder="Column name"><select class="t" data-ct="${i}">${['text','date','select','url','number'].map(t=>`<option${c.type===t?' selected':''}>${t}</option>`).join('')}</select><button class="pill" data-cx="${i}">✕</button></div>`+
+    (c.type==='select'?`<input class="t" data-co="${i}" value="${esc((c.options||[]).join(', '))}" placeholder="Choices, separated by commas" style="margin:-2px 0 10px">`:'')).join('');
+  const s=sheet(`<h2>${l?'List settings':'New list'}</h2><input class="t" id="ln" placeholder="List name" value="${esc(l?l.name:'')}" maxlength="40">
+    ${srv()?`<label class="f">What belongs here (the agent uses this to file things)</label><input class="t" id="lp" value="${esc(l?l.purpose:'')}" maxlength="200" placeholder="e.g. Things to pack for Krakow">
+    <label class="f">Layout</label><div class="seg" id="lk"><button data-k="checklist" class="${kind==='checklist'?'on':''}">Checklist</button><button data-k="table" class="${kind==='table'?'on':''}">Spreadsheet</button></div>
+    <label class="f">Columns (besides the item and its due date)</label><div id="cols">${colRows()}</div><button class="pill" id="addCol">+ Column</button>`:''}
+    <label class="f">Colour</label><div class="colors">${COLORS.map(c=>`<button data-c="${c}" class="${c===color?'on':''}" style="background:${c}"></button>`).join('')}</div>
+    <div class="actions">${l&&!builtin?'<button class="pill danger" id="ldel">Delete list</button>':''}<button class="pill solid" id="lok">${l?'Save':'Create'}</button></div>
+    ${builtin?'<p class="muted" style="font-size:13px;margin-top:14px">One of the built-in TraceyTech lists: it can be changed but not deleted.</p>':''}`);
+  const sync=()=>{$$('[data-ci]',s).forEach(el=>cols[+el.dataset.ci].label=el.value);$$('[data-ct]',s).forEach(el=>cols[+el.dataset.ct].type=el.value);
+    $$('[data-co]',s).forEach(el=>cols[+el.dataset.co].options=el.value.split(',').map(x=>x.trim()).filter(Boolean));};
+  s.addEventListener('change',e=>{if(e.target.dataset.ct){sync();$('#cols',s).innerHTML=colRows();}});
+  s.addEventListener('click',e=>{const x=e.target.closest('[data-cx]');if(x){sync();cols.splice(+x.dataset.cx,1);$('#cols',s).innerHTML=colRows();}
+    const k=e.target.closest('#lk [data-k]');if(k){kind=k.dataset.k;$$('#lk button',s).forEach(b=>b.classList.toggle('on',b===k));}
+    const c=e.target.closest('[data-c]');if(c){color=c.dataset.c;$$('.colors button',s).forEach(b=>b.classList.toggle('on',b===c));}});
+  const ac=$('#addCol',s);if(ac)ac.onclick=()=>{sync();cols.push({label:'',type:'text'});$('#cols',s).innerHTML=colRows();const ins=$$('[data-ci]',s);ins[ins.length-1].focus();};
+  $('#lok',s).onclick=async()=>{const name=$('#ln',s).value.trim();if(!name){toast('Give the list a name.');return;}if(srv())sync();
+    const o={name,color};if(srv()){o.purpose=$('#lp',s).value.trim();o.kind=kind;o.columns=cols.filter(c=>c.label.trim()).map(c=>({key:c.key||c.label,label:c.label.trim(),type:c.type,options:c.options}));}
+    closeSheet();if(l)await store.saveList(id,o);else{const nid=await store.create(o);if(nid)S.sel=String(nid);}await load();};
+  const del=$('#ldel',s);if(del)del.onclick=async()=>{closeSheet();if(await store.remove(id)){S.sel='all';toast('List deleted. Its to-dos moved to To-do.');await load();}};
+  if(!l)setTimeout(()=>$('#ln',s).focus(),250);}
+$('#newList').onclick=()=>listSettings(null);
+
+/* ---------- export ---------- */
+function exportList(l,fmt){const ts=S.todos.filter(t=>t.list===l.id&&t.state!=='ignored').sort((a,b)=>(a.state==='done')-(b.state==='done')||sortOpen(a,b));
+  const cols=l.columns||[],file=l.name.replace(/[^\w\- ]+/g,'').trim().replace(/\s+/g,'-').toLowerCase()||'list';
+  if(fmt==='csv'){const q=v=>{const s=String(v==null?'':v);return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;};
+    const lines=[['Item','Due',...cols.map(c=>c.label),'Done'].map(q).join(','),...ts.map(t=>[t.text,t.due,...cols.map(c=>(t.fields||{})[c.key]||''),t.state==='done'?'Yes':''].map(q).join(','))];
+    share(file+'.csv','text/csv',lines.join('\r\n'));return;}
+  const p=s=>String(s==null?'':s).replace(/\|/g,'\\|');let md='# '+l.name+'\n\n'+(l.purpose?'_'+l.purpose+'_\n\n':'');
+  if(l.kind==='table'&&cols.length){md+='| Done | Item | Due | '+cols.map(c=>p(c.label)).join(' | ')+' |\n|'+' --- |'.repeat(cols.length+3)+'\n'+
+      ts.map(t=>`| ${t.state==='done'?'x':' '} | ${p(t.text)} | ${p(t.due)} | `+cols.map(c=>p((t.fields||{})[c.key]||'')).join(' | ')+' |').join('\n')+'\n';}
+  else md+=ts.map(t=>`- [${t.state==='done'?'x':' '}] ${t.text}`+(t.due?` (due ${t.due})`:'')+cols.filter(c=>(t.fields||{})[c.key]).map(c=>` · ${c.label}: ${t.fields[c.key]}`).join('')).join('\n')+'\n';
+  share(file+'.md','text/markdown',md);}
+function share(name,mime,text){if(N&&N.share)N.share(name,mime,text);else toast('Sharing works inside Conductor IO.');}
+
+/* ---------- the lists agent ---------- */
+function sugText(g){const T=id=>{const t=S.todos.find(x=>x.id===id);return t?'“'+esc(t.text)+'”':'a to-do';};const L=id=>esc((S.lists.find(l=>l.id===String(id))||{}).name||'a list');
+  switch(g.kind){case 'move':return `Move ${T(g.todo)} to ${L(g.list)}`;case 'merge':return `Merge ${(g.todos||[]).length} to-dos into “${esc(g.text||'')}”`;
+    case 'archive':return `Remove ${T(g.todo)}`;case 'update':return `Fill in details for ${T(g.todo)}`;
+    case 'new_list':return `New list “${esc(g.name)}”`+((g.todos||[]).length?` with ${g.todos.length} to-do${g.todos.length>1?'s':''}`:'');
+    case 'columns':return `Set the columns of ${L(g.list)} to ${(g.columns||[]).map(c=>esc(c.label)).join(', ')}`;}return esc(g.kind);}
+function agentSheet(){const a=S.agent||{};
+  const when=a.lastReview?new Date(a.lastReview).toLocaleString('en-GB',{weekday:'short',hour:'2-digit',minute:'2-digit'}):'not yet';
+  const s=sheet(`<h2>✦ Lists agent</h2><p class="muted" style="margin:-6px 0 12px;font-size:13px">Files every new to-do into the right list and fills in its columns. Every few hours it checks your lists for duplicates, stale items and better ways to organise them. Last check: ${esc(when)}.</p>
+    ${S.sugs.length?S.sugs.map(g=>`<div class="sug" data-s="${g.id}"><div class="what">${sugText(g)}</div><div class="why">${esc(g.reason||'')}</div><div class="row"><button class="pill solid" data-ap="${g.id}">Apply</button><button class="pill" data-dm="${g.id}">Dismiss</button></div></div>`).join('')
+      :'<p class="muted">No suggestions right now. Your lists look tidy.</p>'}
+    <div class="actions">${S.sugs.length>1?'<button class="pill solid" id="apAll">Apply all</button>':''}<button class="pill" id="runNow">Check my lists now</button></div>
+    <div class="line" style="display:flex;align-items:center;gap:12px;margin-top:16px"><div style="flex:1">Tidy without asking<div class="muted" style="font-size:13px">Apply the agent's changes straight away. Removed items can be found in TraceyTech.</div></div>
+      <label class="sw2"><input type="checkbox" id="auto"${a.auto?' checked':''}><span></span></label></div>`);
+  s.onclick=async e=>{const ap=e.target.closest('[data-ap]'),dm=e.target.closest('[data-dm]');
+    if(ap||dm){const id=Number((ap||dm).dataset.ap||(ap||dm).dataset.dm);(ap||dm).closest('.sug').style.opacity=.4;
+      const r=await post({op:ap?'apply':'dismiss',id});if(ap&&r.ok&&r.json.results&&r.json.results[0]&&!r.json.results[0].ok)toast(esc(r.json.results[0].error));
+      S.sugs=S.sugs.filter(x=>x.id!==id);(ap||dm).closest('.sug').remove();haptic();load();if(!S.sugs.length)closeSheet();return;}
+    if(e.target.id==='apAll'){closeSheet();const r=await post({op:'apply',ids:S.sugs.map(x=>x.id)});if(r.ok)toast('Done. Your lists are tidied.');await load();}
+    if(e.target.id==='runNow'){e.target.disabled=true;e.target.textContent='Checking…';const r=await post({op:'agent',force:true});await load();
+      closeSheet();toast(r.ok?(S.sugs.length?'The agent has '+S.sugs.length+' suggestion'+(S.sugs.length>1?'s':'')+'.':'All tidy. Nothing to change.')+(r.json.filed&&r.json.filed.length?' Filed '+r.json.filed.length+' new to-do'+(r.json.filed.length>1?'s':'')+'.':''):'The agent could not run.');}};
+  $('#auto',s).onchange=e=>post({op:'setting',auto:e.target.checked}).then(()=>{S.agent.auto=e.target.checked;});}
+$('#agentBtn').onclick=agentSheet;
+
+window.onNativeShow=()=>load();
+window.onNativeReselect=()=>{S.sel='all';render();window.scrollTo({top:0,behavior:'smooth'});load();};
+window.onNativeChange=()=>{};
+window.onNativeOpenAgent=()=>{load().then(agentSheet);};
+if(location.hash==='#agent'){history.replaceState(null,'',location.pathname);load().then(agentSheet);}else load();
+</script>
+</body>
+</html>
