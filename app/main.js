@@ -613,25 +613,34 @@ function neighbours(id){const g=S.graph;const out=new Set();g.edges.forEach(([a,
 let labelEls=new Map();
 function buildLabels(){
   const box=$('map-labels');box.innerHTML='';labelEls=new Map();
-  S.graph.nodes.filter(n=>n.kind!=='asset').forEach(n=>{const b=document.createElement('button');b.type='button';b.className=`ml ${n.kind} ${n.crit?'crit':''} ${n.sample?'smp':''}`;
+  S.graph.nodes.forEach(n=>{const b=document.createElement('button');b.type='button';b.className=`ml ${n.kind} ${n.crit?'crit':''} ${n.sample?'smp':''}`;
+    if(n.col)b.style.setProperty('--c',n.col);if(n.area&&n.kind!=='project'&&n.kind!=='source')b.title=n.area;
     b.textContent=n.label.length>38?n.label.slice(0,36)+'…':n.label;b.addEventListener('click',e=>{e.stopPropagation();tapNode(n,b);});box.appendChild(b);labelEls.set(n.id,b);});
   const k=S.graph.nodes.reduce((m,n)=>(m[n.kind]=(m[n.kind]||0)+1,m),{});
   $('map-meta').textContent=`${k.source} sources · ${k.project} projects · ${k.asset} assets · ${k.item} live items`;
+  const lg=$('map-legend');if(lg){const areas=S.graph.nodes.filter(n=>n.kind==='project'&&n.col);
+    lg.innerHTML=areas.map(n=>`<span><i style="background:${esc(n.col)}"></i>${esc(n.label)}</span>`).join('')+'<span><i class="crit"></i>Needs you</span><span><i class="smp"></i>Sample</span><span class="hint">Drag to turn · pinch or scroll to zoom · two fingers to move · tap to open</span>';}
 }
 function drawLabels(){
   const hot=env.hot;const near=hot?new Set(neighbours(hot).map(n=>n.id)):null;const sm=innerWidth<700;
   env.screen().forEach(({n,x,y,z})=>{const b=labelEls.get(n.id);if(!b)return;
-    const show=n.kind!=='item'||!sm||n.crit||n.id===hot||(near&&near.has(n.id));
+    const zm=env.zoom||1,nb=near&&near.has(n.id);
+    const show=n.kind==='asset'?(n.id===hot||(nb&&zm>=1.3)||zm>=2.3):n.kind!=='item'||!sm||n.crit||n.id===hot||nb||zm>=1.6;
     const dim=hot&&n.id!==hot&&!(near&&near.has(n.id))&&n.kind!=='hub';
     b.style.transform=`translate(${x.toFixed(1)}px,${y.toFixed(1)}px)`;b.style.opacity=show?(dim?.28:1)*(1.15-Math.max(0,z-.9)*8):0;b.style.pointerEvents=show?'auto':'none';b.classList.toggle('on',n.id===hot);});
 }
 function tapNode(n,el){
+  env.centre&&env.centre();
+  if(n.kind==='asset'){env.hot=n.id;return;}
   if(n.kind==='item'){env.hot=n.id;openFocus(n.ref,el);return;}
   env.hot=env.hot===n.id?null:n.id;if(!env.hot)return;
   openFocus({kind:'node',n,key:'n:'+n.id,node:n.kind==='source'?n.label:null,sample:false},el);
 }
-function openMap(){if(!$('env'))return;toggleMenu(false);document.body.classList.add('map');env.mapGoal=1;$('mapui').hidden=false;buildLabels();env.onFrame=drawLabels;}
-function closeMap(){document.body.classList.remove('map');env.mapGoal=0;env.hot=null;$('mapui').hidden=true;env.onFrame=null;}
+function appPull(on){try{window.ConductorPage&&window.ConductorPage.top(!!on);}catch(e){}}
+function openMap(){if(!$('env'))return;toggleMenu(false);document.body.classList.add('map');env.mapGoal=1;$('mapui').hidden=false;buildLabels();env.onFrame=drawLabels;appPull(false);
+  env.onEmptyTap=()=>{env.hot=null;};}
+function closeMap(){document.body.classList.remove('map');env.mapGoal=0;env.hot=null;$('mapui').hidden=true;env.onFrame=null;env.resetView&&env.resetView();appPull(true);}
+{const zb=(id,f)=>{const b=$(id);if(b)b.addEventListener('click',f);};zb('map-zin',()=>env.zoomBy&&env.zoomBy(1.35));zb('map-zout',()=>env.zoomBy&&env.zoomBy(1/1.35));zb('map-zfit',()=>{env.hot=null;env.resetView&&env.resetView();});}
 $('map-open').addEventListener('click',()=>{closePane(true);openMap();});$('map-menu').addEventListener('click',openMap);$('map-close').addEventListener('click',closeMap);
 function nodeDetail(n){
   const nb=neighbours(n.id);const items=nb.filter(x=>x.kind==='item');const assets=nb.filter(x=>x.kind==='asset');const links=nb.filter(x=>x.kind==='source'||x.kind==='project');
